@@ -29,7 +29,7 @@ jobs:
           go-version: "1.23"
 
       - name: Run Super-Linter
-        uses: super-linter/super-linter/slim@v7
+        uses: super-linter/super-linter/slim@e1cb86b
         env:
           VALIDATE_ALL_CODEBASE: true
           DEFAULT_BRANCH: "main"
