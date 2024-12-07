@@ -3,7 +3,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -11,20 +10,88 @@ import (
 	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
+	"github.com/cli/go-gh/v2/pkg/browser"
 	"github.com/github/gh-skyline/ascii"
 	"github.com/github/gh-skyline/errors"
 	"github.com/github/gh-skyline/github"
 	"github.com/github/gh-skyline/logger"
 	"github.com/github/gh-skyline/stl"
 	"github.com/github/gh-skyline/types"
+	"github.com/spf13/cobra"
 )
 
+// Constants for GitHub launch year and default output file format
 const (
-	// githubLaunchYear represents the year GitHub was launched and contributions began
 	githubLaunchYear = 2008
-	// outputFileFormat defines the format for the generated STL file
 	outputFileFormat = "%s-%s-github-skyline.stl"
 )
+
+// Command line variables and root command configuration
+var (
+	yearRange string
+	user      string
+	full      bool
+	debug     bool
+	web       bool
+	output    string // new output path flag
+
+	rootCmd = &cobra.Command{
+		Use:   "skyline",
+		Short: "Generate a 3D model of a user's GitHub contribution history",
+		Long: `GitHub Skyline creates 3D printable STL files from GitHub contribution data.
+It can generate models for specific years or year ranges for the authenticated user or an optional specified user.
+
+ASCII Preview Legend:
+  ' ' Empty/Sky     - No contributions
+  '.' Future dates  - What contributions could you make?
+  '░' Low level     - Light contribution activity
+  '▒' Medium level  - Moderate contribution activity
+  '▓' High level    - Heavy contribution activity
+  '╻┃╽' Top level   - Last block with contributions in the week (Low, Medium, High)
+
+Layout:
+Each column represents one week. Days within each week are reordered vertically
+to create a "building" effect, with empty spaces (no contributions) at the top.`,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			log := logger.GetLogger()
+			if debug {
+				log.SetLevel(logger.DEBUG)
+				if err := log.Debug("Debug logging enabled"); err != nil {
+					return err
+				}
+			}
+
+			if web {
+				return openGitHubProfile(user)
+			}
+
+			startYear, endYear, err := parseYearRange(yearRange)
+			if err != nil {
+				return fmt.Errorf("invalid year range: %v", err)
+			}
+
+			return generateSkyline(startYear, endYear, user, full)
+		},
+	}
+)
+
+// init sets up command line flags for the skyline CLI tool
+func init() {
+	rootCmd.Flags().StringVarP(&yearRange, "year", "y", fmt.Sprintf("%d", time.Now().Year()), "Year or year range (e.g., 2024 or 2014-2024)")
+	rootCmd.Flags().StringVarP(&user, "user", "u", "", "GitHub username (optional, defaults to authenticated user)")
+	rootCmd.Flags().BoolVarP(&full, "full", "f", false, "Generate contribution graph from join year to current year")
+	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "Enable debug logging")
+	rootCmd.Flags().BoolVarP(&web, "web", "w", false, "Open GitHub profile (authenticated or specified user).")
+	rootCmd.Flags().StringVarP(&output, "output", "o", "", "Output file path (optional)")
+}
+
+// main initializes and executes the root command for the GitHub Skyline CLI
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
 
 // formatYearRange returns a formatted string representation of the year range
 func formatYearRange(startYear, endYear int) string {
@@ -36,6 +103,13 @@ func formatYearRange(startYear, endYear int) string {
 
 // generateOutputFilename creates a consistent filename for the STL output
 func generateOutputFilename(user string, startYear, endYear int) string {
+	if output != "" {
+		// Ensure the filename ends with .stl
+		if !strings.HasSuffix(strings.ToLower(output), ".stl") {
+			return output + ".stl"
+		}
+		return output
+	}
 	yearStr := formatYearRange(startYear, endYear)
 	return fmt.Sprintf(outputFileFormat, user, yearStr)
 }
@@ -143,40 +217,6 @@ func fetchContributionData(client *github.Client, username string, year int) ([]
 	return contributionGrid, nil
 }
 
-// main is the entry point for the GitHub Skyline Generator.
-func main() {
-	yearRange := flag.String("year", fmt.Sprintf("%d", time.Now().Year()), "Year or year range (e.g., 2024 or 2014-2024)")
-	user := flag.String("user", "", "GitHub username (optional, defaults to authenticated user)")
-	full := flag.Bool("full", false, "Generate contribution graph from join year to current year")
-	debug := flag.Bool("debug", false, "Enable debug logging")
-	flag.Parse()
-
-	log := logger.GetLogger()
-	if *debug {
-		log.SetLevel(logger.DEBUG)
-		if err := log.Debug("Debug logging enabled"); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to enable debug logging: %v\n", err)
-			os.Exit(1)
-		}
-	}
-
-	// Parse year range
-	startYear, endYear, err := parseYearRange(*yearRange)
-	if err != nil {
-		if logErr := log.Error("Invalid year range: %v", err); logErr != nil {
-			fmt.Fprintf(os.Stderr, "Failed to log error: %v\n", logErr)
-		}
-		os.Exit(1)
-	}
-
-	if err := generateSkyline(startYear, endYear, *user, *full); err != nil {
-		if logErr := log.Error("Failed to generate skyline: %v", err); logErr != nil {
-			fmt.Fprintf(os.Stderr, "Failed to log error: %v\n", logErr)
-		}
-		os.Exit(1)
-	}
-}
-
 // Parse year range string (e.g., "2024" or "2014-2024")
 func parseYearRange(yearRange string) (startYear, endYear int, err error) {
 	if strings.Contains(yearRange, "-") {
@@ -211,4 +251,24 @@ func validateYearRange(startYear, endYear int) error {
 		return fmt.Errorf("start year cannot be after end year")
 	}
 	return nil
+}
+
+// openGitHubProfile opens the GitHub profile page for the specified user or authenticated user
+func openGitHubProfile(targetUser string) error {
+	if targetUser == "" {
+		client, err := initializeGitHubClient()
+		if err != nil {
+			return errors.New(errors.NetworkError, "failed to initialize GitHub client", err)
+		}
+
+		username, err := client.GetAuthenticatedUser()
+		if err != nil {
+			return errors.New(errors.NetworkError, "failed to get authenticated user", err)
+		}
+		targetUser = username
+	}
+
+	profileURL := fmt.Sprintf("https://github.com/%s", targetUser)
+	b := browser.New("", os.Stdout, os.Stderr)
+	return b.Browse(profileURL)
 }

@@ -45,7 +45,7 @@ func GetLogger() *Logger {
 	once.Do(func() {
 		instance = &Logger{
 			debug:   log.New(os.Stdout, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile),
-			info:    log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime),
+			info:    log.New(os.Stdout, "", 0),
 			warning: log.New(os.Stdout, "WARNING: ", log.Ldate|log.Ltime),
 			error:   log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime),
 			level:   INFO,
