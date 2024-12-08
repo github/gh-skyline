@@ -12,7 +12,15 @@ updates:
     allow:
       - dependency-type: "direct"
       - dependency-type: "indirect"
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"
   - package-ecosystem: "github-actions" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
