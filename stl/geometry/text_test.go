@@ -144,6 +144,7 @@ func TestCalculatePixelIntensity(t *testing.T) {
 	})
 
 	t.Run("verify gradient circle intensity", func(t *testing.T) {
+		// Create a 100x100 image with a radial gradient circle
 		size := 100
 		dc := gg.NewContext(size, size)
 		dc.SetRGB(0, 0, 0)
