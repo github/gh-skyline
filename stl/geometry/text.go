@@ -246,7 +246,14 @@ func renderImage(config imageRenderConfig) ([]types.Triangle, error) {
 // calculatePixelIntensity returns the intensity of a pixel at the given coordinates
 // as a float64 value between 0.0 (black) and 1.0 (white).
 func calculatePixelIntensity(dc *gg.Context, x, y int) float64 {
-	r, _, _, _ := dc.Image().At(x, y).RGBA()
-	intensity := float64(r) / 65535.0
+	// Get RGB values from pixel
+	r, g, b, _ := dc.Image().At(x, y).RGBA()
+
+	// Convert to grayscale
+	gray := 0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b)
+
+	// Normalize to 0-1 range (RGBA values are in 0-65535 range)
+	intensity := gray / 65535.0
+
 	return intensity
 }
