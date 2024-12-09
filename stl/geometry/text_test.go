@@ -117,7 +117,7 @@ func TestIsPixelActive(t *testing.T) {
 		dc.SetRGB(1, 1, 1) // White
 		dc.Clear()
 
-		if !isPixelActive(dc, 0, 0) {
+		if isPixelActive(dc, 0, 0) <= 0 {
 			t.Error("Expected white pixel to be active")
 		}
 	})
@@ -127,8 +127,19 @@ func TestIsPixelActive(t *testing.T) {
 		dc.SetRGB(0, 0, 0) // Black
 		dc.Clear()
 
-		if isPixelActive(dc, 0, 0) {
+		if isPixelActive(dc, 0, 0) > 0 {
 			t.Error("Expected black pixel to be inactive")
+		}
+	})
+
+	t.Run("verify grayscale pixel detection", func(t *testing.T) {
+		dc := gg.NewContext(1, 1)
+		dc.SetRGB(0.5, 0.5, 0.5) // Gray
+		dc.Clear()
+
+		intensity := isPixelActive(dc, 0, 0)
+		if intensity <= 0 || intensity >= 1 {
+			t.Errorf("Expected grayscale pixel to have intensity between 0 and 1, got %f", intensity)
 		}
 	})
 }
