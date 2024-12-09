@@ -135,7 +135,7 @@ func renderText(config textRenderConfig) ([]types.Triangle, error) {
 
 	for y := 0; y < config.contextHeight; y++ {
 		for x := 0; x < config.contextWidth; x++ {
-			intensity := isPixelActive(dc, x, y)
+			intensity := calculatePixelIntensity(dc, x, y)
 			if intensity > 0 {
 				xPos := config.startX + float64(x)*config.voxelScale/8
 				zPos := config.startZ - float64(y)*config.voxelScale/8
@@ -243,8 +243,10 @@ func renderImage(config imageRenderConfig) ([]types.Triangle, error) {
 	return triangles, nil
 }
 
-// isPixelActive checks if a pixel is active (white) in the given context.
-func isPixelActive(dc *gg.Context, x, y int) float64 {
+// calculatePixelIntensity returns the intensity of a pixel at the given coordinates
+// as a float64 value between 0.0 (black) and 1.0 (white).
+func calculatePixelIntensity(dc *gg.Context, x, y int) float64 {
 	r, _, _, _ := dc.Image().At(x, y).RGBA()
-	return float64(r) / 65535.0
+	intensity := float64(r) / 65535.0
+	return intensity
 }

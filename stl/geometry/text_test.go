@@ -110,36 +110,76 @@ func TestRenderImage(t *testing.T) {
 	})
 }
 
-// TestIsPixelActive verifies pixel activity detection
-func TestIsPixelActive(t *testing.T) {
-	t.Run("verify white pixel detection", func(t *testing.T) {
+// TestCalculatePixelIntensity verifies pixel intensity calculation
+func TestCalculatePixelIntensity(t *testing.T) {
+	t.Run("verify white pixel intensity", func(t *testing.T) {
 		dc := gg.NewContext(1, 1)
 		dc.SetRGB(1, 1, 1) // White
 		dc.Clear()
 
-		if isPixelActive(dc, 0, 0) <= 0 {
-			t.Error("Expected white pixel to be active")
+		if calculatePixelIntensity(dc, 0, 0) <= 0 {
+			t.Error("Expected white pixel to have positive intensity")
 		}
 	})
 
-	t.Run("verify black pixel detection", func(t *testing.T) {
+	t.Run("verify black pixel intensity", func(t *testing.T) {
 		dc := gg.NewContext(1, 1)
 		dc.SetRGB(0, 0, 0) // Black
 		dc.Clear()
 
-		if isPixelActive(dc, 0, 0) > 0 {
-			t.Error("Expected black pixel to be inactive")
+		if calculatePixelIntensity(dc, 0, 0) > 0 {
+			t.Error("Expected black pixel to have zero intensity")
 		}
 	})
 
-	t.Run("verify grayscale pixel detection", func(t *testing.T) {
+	t.Run("verify grayscale pixel intensity", func(t *testing.T) {
 		dc := gg.NewContext(1, 1)
 		dc.SetRGB(0.5, 0.5, 0.5) // Gray
 		dc.Clear()
 
-		intensity := isPixelActive(dc, 0, 0)
+		intensity := calculatePixelIntensity(dc, 0, 0)
 		if intensity <= 0 || intensity >= 1 {
 			t.Errorf("Expected grayscale pixel to have intensity between 0 and 1, got %f", intensity)
+		}
+	})
+
+	t.Run("verify gradient circle intensity", func(t *testing.T) {
+		size := 100
+		dc := gg.NewContext(size, size)
+		dc.SetRGB(0, 0, 0)
+		dc.Clear()
+
+		// Draw a single circle with gradient
+		centerX, centerY := float64(size/2), float64(size/2)
+		radius := float64(size / 2)
+
+		// Create radial gradient
+		gradient := gg.NewRadialGradient(centerX, centerY, 0, centerX, centerY, radius)
+		gradient.AddColorStop(0, color.White)
+		gradient.AddColorStop(1, color.Black)
+
+		dc.SetFillStyle(gradient)
+		dc.DrawCircle(centerX, centerY, radius)
+		dc.Fill()
+
+		// Test points at different distances from center
+		testPoints := []struct {
+			x, y     int
+			minRange float64
+			maxRange float64
+		}{
+			{size / 2, size / 2, 0.9, 1.0}, // Center (highest intensity)
+			{size / 4, size / 4, 0.3, 0.7}, // Quarter way (medium intensity)
+			{size - 1, size - 1, 0.0, 0.1}, // Corner (lowest intensity)
+		}
+
+		for _, pt := range testPoints {
+			intensity := calculatePixelIntensity(dc, pt.x, pt.y)
+			t.Logf("Pixel at (%d,%d) has intensity %f", pt.x, pt.y, intensity)
+			if intensity < pt.minRange || intensity > pt.maxRange {
+				t.Errorf("Pixel at (%d,%d) has intensity %f, expected between %f and %f",
+					pt.x, pt.y, intensity, pt.minRange, pt.maxRange)
+			}
 		}
 	})
 }
