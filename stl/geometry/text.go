@@ -37,8 +37,8 @@ type imageRenderConfig struct {
 }
 
 const (
-	imagePosition  = 0.025
-	textPadding = 0.1 // 10%
+	imagePosition = 0.025
+	textPadding   = 0.1 // 10%
 
 	defaultContextWidth  = 800
 	defaultContextHeight = 200
@@ -84,7 +84,7 @@ func Create3DText(username string, year string, innerWidth, baseHeight float64) 
 
 	yearConfig := textRenderConfig{
 		renderConfig: renderConfig{
-			startX:     innerWidth * (1-textPadding) - 75 ,
+			startX:     innerWidth*(1-textPadding) - 75,
 			startY:     -textDepthOffset / 2,
 			startZ:     baseHeight * yearZOffset,
 			voxelScale: textVoxelSize * 0.75,
