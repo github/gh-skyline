@@ -26,6 +26,7 @@ type textRenderConfig struct {
 	contextWidth  int
 	contextHeight int
 	fontSize      float64
+	alignment     gg.Align
 }
 
 // ImageConfig holds parameters for image rendering
@@ -37,8 +38,7 @@ type imageRenderConfig struct {
 
 const (
 	imagePosition  = 0.025
-	usernameOffset = -0.01
-	yearPosition   = 0.77
+	textPadding = 0.1 // 10%
 
 	defaultContextWidth  = 800
 	defaultContextHeight = 200
@@ -69,7 +69,7 @@ func Create3DText(username string, year string, innerWidth, baseHeight float64) 
 
 	usernameConfig := textRenderConfig{
 		renderConfig: renderConfig{
-			startX:     innerWidth * usernameOffset,
+			startX:     innerWidth * textPadding,
 			startY:     -textDepthOffset / 2,
 			startZ:     baseHeight * usernameZOffset,
 			voxelScale: textVoxelSize,
@@ -79,11 +79,12 @@ func Create3DText(username string, year string, innerWidth, baseHeight float64) 
 		contextWidth:  usernameContextWidth,
 		contextHeight: usernameContextHeight,
 		fontSize:      usernameFontSize,
+		alignment:     gg.AlignLeft,
 	}
 
 	yearConfig := textRenderConfig{
 		renderConfig: renderConfig{
-			startX:     innerWidth * yearPosition,
+			startX:     innerWidth * (1-textPadding) - 75 ,
 			startY:     -textDepthOffset / 2,
 			startZ:     baseHeight * yearZOffset,
 			voxelScale: textVoxelSize * 0.75,
@@ -93,6 +94,7 @@ func Create3DText(username string, year string, innerWidth, baseHeight float64) 
 		contextWidth:  yearContextWidth,
 		contextHeight: yearContextHeight,
 		fontSize:      yearFontSize,
+		alignment:     gg.AlignRight,
 	}
 
 	usernameTriangles, err := renderText(usernameConfig)
@@ -129,7 +131,7 @@ func renderText(config textRenderConfig) ([]types.Triangle, error) {
 	dc.SetRGB(0, 0, 0)
 	dc.Clear()
 	dc.SetRGB(1, 1, 1)
-	dc.DrawStringAnchored(config.text, float64(config.contextWidth)/8, float64(config.contextHeight)/2, 0.0, 0.5)
+	dc.DrawStringWrapped(config.text, 0, float64(config.contextHeight)/2, 0.0, 0.5, float64(config.contextWidth), 1.5, config.alignment)
 
 	var triangles []types.Triangle
 
