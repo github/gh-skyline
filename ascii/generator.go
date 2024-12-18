@@ -16,7 +16,7 @@ var ErrInvalidGrid = errors.New("invalid contribution grid")
 // GenerateASCII creates a 2D ASCII art representation of the contribution data.
 // It returns the generated ASCII art as a string and an error if the operation fails.
 // When includeHeader is true, the output includes the header template.
-func GenerateASCII(contributionGrid [][]types.ContributionDay, username string, year int, includeHeader bool) (string, error) {
+func GenerateASCII(contributionGrid [][]types.ContributionDay, username string, year int, includeHeader bool, includeUserInfo bool) (string, error) {
 	if len(contributionGrid) == 0 {
 		return "", ErrInvalidGrid
 	}
@@ -74,10 +74,12 @@ func GenerateASCII(contributionGrid [][]types.ContributionDay, username string, 
 		buffer.WriteRune('\n')
 	}
 
-	// Add centered user info below
-	buffer.WriteString("\n")
-	buffer.WriteString(centerText(username))
-	buffer.WriteString(centerText(fmt.Sprintf("%d", year)))
+	if includeUserInfo {
+		// Add centered user info below
+		buffer.WriteString("\n")
+		buffer.WriteString(centerText(username))
+		buffer.WriteString(centerText(fmt.Sprintf("%d", year)))
+	}
 
 	return buffer.String(), nil
 }
