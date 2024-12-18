@@ -9,9 +9,8 @@ import (
 )
 
 // ContributionDay represents a single day of GitHub contributions.
-// It contains the number of contributions made on a specific date.
 type ContributionDay struct {
-	ContributionCount int
+	ContributionCount int    `json:"contributionCount"`
 	Date              string `json:"date"`
 }
 
@@ -37,22 +36,19 @@ func (c ContributionDay) Validate() error {
 	return nil
 }
 
-// ContributionsResponse represents the GitHub GraphQL API response structure
-// for fetching user contributions data.
+// ContributionsResponse represents the contribution data returned by the GitHub API.
 type ContributionsResponse struct {
-	Data struct {
-		User struct {
-			Login                   string
-			ContributionsCollection struct {
-				ContributionCalendar struct {
-					TotalContributions int `json:"totalContributions"`
-					Weeks              []struct {
-						ContributionDays []ContributionDay `json:"contributionDays"`
-					} `json:"weeks"`
-				} `json:"contributionCalendar"`
-			} `json:"contributionsCollection"`
-		} `json:"user"`
-	} `json:"data"`
+	User struct {
+		Login                   string `json:"login"`
+		ContributionsCollection struct {
+			ContributionCalendar struct {
+				TotalContributions int `json:"totalContributions"`
+				Weeks              []struct {
+					ContributionDays []ContributionDay `json:"contributionDays"`
+				} `json:"weeks"`
+			} `json:"contributionCalendar"`
+		} `json:"contributionsCollection"`
+	} `json:"user"`
 }
 
 // Point3D represents a point in 3D space using float64 for accuracy in calculations.

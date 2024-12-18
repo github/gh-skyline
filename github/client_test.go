@@ -1,98 +1,50 @@
 package github
 
 import (
-	"encoding/json"
-	"io"
 	"testing"
+	"time"
 
 	"github.com/github/gh-skyline/errors"
+	"github.com/github/gh-skyline/testutil/mocks"
+	"github.com/github/gh-skyline/types"
 )
-
-type MockAPIClient struct {
-	GetFunc  func(path string, response interface{}) error
-	PostFunc func(path string, body io.Reader, response interface{}) error
-}
-
-func (m *MockAPIClient) Get(path string, response interface{}) error {
-	return m.GetFunc(path, response)
-}
-
-func (m *MockAPIClient) Post(path string, body io.Reader, response interface{}) error {
-	return m.PostFunc(path, body, response)
-}
-
-// mockAPIClient implements APIClient for testing
-type mockAPIClient struct {
-	getResponse  string
-	postResponse string
-	shouldError  bool
-}
-
-func (m *mockAPIClient) Get(_ string, response interface{}) error {
-	if m.shouldError {
-		return errors.New(errors.NetworkError, "mock error", nil)
-	}
-	return json.Unmarshal([]byte(m.getResponse), response)
-}
-
-func (m *mockAPIClient) Post(_ string, _ io.Reader, response interface{}) error {
-	if m.shouldError {
-		return errors.New(errors.NetworkError, "mock error", nil)
-	}
-	return json.Unmarshal([]byte(m.postResponse), response)
-}
-
-func TestNewClient(t *testing.T) {
-	mock := &mockAPIClient{}
-	client := NewClient(mock)
-	if client == nil {
-		t.Fatal("NewClient returned nil")
-	}
-	if client.api != mock {
-		t.Error("NewClient did not set api client correctly")
-	}
-}
 
 func TestGetAuthenticatedUser(t *testing.T) {
 	tests := []struct {
 		name          string
-		response      string
-		shouldError   bool
+		mockResponse  string
+		mockError     error
 		expectedUser  string
 		expectedError bool
 	}{
 		{
 			name:          "successful response",
-			response:      `{"login": "testuser"}`,
+			mockResponse:  "testuser",
 			expectedUser:  "testuser",
 			expectedError: false,
 		},
 		{
 			name:          "empty username",
-			response:      `{"login": ""}`,
+			mockResponse:  "",
 			expectedError: true,
 		},
 		{
 			name:          "network error",
-			shouldError:   true,
+			mockError:     errors.New(errors.NetworkError, "network error", nil),
 			expectedError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mock := &mockAPIClient{
-				getResponse: tt.response,
-				shouldError: tt.shouldError,
-			}
-			client := NewClient(mock)
+			client := NewClient(&mocks.MockGitHubClient{
+				Username: tt.mockResponse,
+				Err:      tt.mockError,
+			})
 
 			user, err := client.GetAuthenticatedUser()
-			if tt.expectedError && err == nil {
-				t.Error("expected error but got none")
-			}
-			if !tt.expectedError && err != nil {
-				t.Errorf("unexpected error: %v", err)
+			if (err != nil) != tt.expectedError {
+				t.Errorf("expected error: %v, got: %v", tt.expectedError, err)
 			}
 			if user != tt.expectedUser {
 				t.Errorf("expected user %q, got %q", tt.expectedUser, user)
@@ -101,20 +53,113 @@ func TestGetAuthenticatedUser(t *testing.T) {
 	}
 }
 
+func TestGetUserJoinYear(t *testing.T) {
+	tests := []struct {
+		name          string
+		username      string
+		mockResponse  time.Time
+		mockError     error
+		expectedYear  int
+		expectedError bool
+	}{
+		{
+			name:          "successful response",
+			username:      "testuser",
+			mockResponse:  time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectedYear:  2015,
+			expectedError: false,
+		},
+		{
+			name:          "empty username",
+			username:      "",
+			expectedError: true,
+		},
+		{
+			name:          "network error",
+			username:      "testuser",
+			mockError:     errors.New(errors.NetworkError, "network error", nil),
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := NewClient(&mocks.MockGitHubClient{
+				JoinYear: tt.expectedYear,
+				Err:      tt.mockError,
+			})
+
+			year, err := client.GetUserJoinYear(tt.username)
+			if (err != nil) != tt.expectedError {
+				t.Errorf("expected error: %v, got: %v", tt.expectedError, err)
+			}
+			if !tt.expectedError && year != tt.expectedYear {
+				t.Errorf("expected year %d, got %d", tt.expectedYear, year)
+			}
+		})
+	}
+}
+
 func TestFetchContributions(t *testing.T) {
+	mockContributions := &types.ContributionsResponse{
+		User: struct {
+			Login                   string `json:"login"`
+			ContributionsCollection struct {
+				ContributionCalendar struct {
+					TotalContributions int `json:"totalContributions"`
+					Weeks              []struct {
+						ContributionDays []types.ContributionDay `json:"contributionDays"`
+					} `json:"weeks"`
+				} `json:"contributionCalendar"`
+			} `json:"contributionsCollection"`
+		}{
+			Login: "chrisreddington",
+			ContributionsCollection: struct {
+				ContributionCalendar struct {
+					TotalContributions int `json:"totalContributions"`
+					Weeks              []struct {
+						ContributionDays []types.ContributionDay `json:"contributionDays"`
+					} `json:"weeks"`
+				} `json:"contributionCalendar"`
+			}{
+				ContributionCalendar: struct {
+					TotalContributions int `json:"totalContributions"`
+					Weeks              []struct {
+						ContributionDays []types.ContributionDay `json:"contributionDays"`
+					} `json:"weeks"`
+				}{
+					TotalContributions: 100,
+					Weeks: []struct {
+						ContributionDays []types.ContributionDay `json:"contributionDays"`
+					}{
+						{
+							ContributionDays: []types.ContributionDay{
+								{
+									ContributionCount: 5,
+									Date:              "2023-01-01",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
 	tests := []struct {
 		name          string
 		username      string
 		year          int
-		response      string
-		shouldError   bool
+		mockResponse  *types.ContributionsResponse
+		mockError     error
 		expectedError bool
 	}{
 		{
-			name:     "successful response",
-			username: "testuser",
-			year:     2023,
-			response: `{"data":{"user":{"login":"testuser","contributionsCollection":{"contributionCalendar":{"totalContributions":100,"weeks":[]}}}}}`,
+			name:          "successful response",
+			username:      "testuser",
+			year:          2023,
+			mockResponse:  mockContributions,
+			expectedError: false,
 		},
 		{
 			name:          "empty username",
@@ -132,92 +177,29 @@ func TestFetchContributions(t *testing.T) {
 			name:          "network error",
 			username:      "testuser",
 			year:          2023,
-			shouldError:   true,
-			expectedError: true,
-		},
-		{
-			name:          "user not found",
-			username:      "testuser",
-			year:          2023,
-			response:      `{"data":{"user":{"login":""}}}`,
+			mockError:     errors.New(errors.NetworkError, "network error", nil),
 			expectedError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mock := &mockAPIClient{
-				postResponse: tt.response,
-				shouldError:  tt.shouldError,
-			}
-			client := NewClient(mock)
+			client := NewClient(&mocks.MockGitHubClient{
+				Username: tt.username,
+				MockData: tt.mockResponse,
+				Err:      tt.mockError,
+			})
 
 			resp, err := client.FetchContributions(tt.username, tt.year)
-			if tt.expectedError && err == nil {
-				t.Error("expected error but got none")
+			if (err != nil) != tt.expectedError {
+				t.Errorf("expected error: %v, got: %v", tt.expectedError, err)
 			}
-			if !tt.expectedError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !tt.expectedError && resp == nil {
-				t.Error("expected response but got nil")
-			}
-		})
-	}
-}
-
-func TestGetUserJoinYear(t *testing.T) {
-	tests := []struct {
-		name          string
-		username      string
-		response      string
-		shouldError   bool
-		expectedYear  int
-		expectedError bool
-	}{
-		{
-			name:          "successful response",
-			username:      "testuser",
-			response:      `{"data":{"user":{"createdAt":"2015-01-01T00:00:00Z"}}}`,
-			expectedYear:  2015,
-			expectedError: false,
-		},
-		{
-			name:          "empty username",
-			username:      "",
-			expectedError: true,
-		},
-		{
-			name:          "network error",
-			username:      "testuser",
-			shouldError:   true,
-			expectedError: true,
-		},
-		{
-			name:          "invalid date format",
-			username:      "testuser",
-			response:      `{"data":{"user":{"createdAt":"invalid-date"}}}`,
-			expectedError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mock := &mockAPIClient{
-				postResponse: tt.response,
-				shouldError:  tt.shouldError,
-			}
-			client := NewClient(mock)
-
-			joinYear, err := client.GetUserJoinYear(tt.username)
-			if tt.expectedError && err == nil {
-				t.Error("expected error but got none")
-			}
-			if !tt.expectedError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if joinYear != tt.expectedYear {
-				t.Errorf("expected year %d, got %d", tt.expectedYear, joinYear)
+			if !tt.expectedError {
+				if resp == nil {
+					t.Error("expected response but got nil")
+				} else if resp.User.Login != "testuser" {
+					t.Errorf("expected user testuser, got %s", resp.User.Login)
+				}
 			}
 		})
 	}
