@@ -45,6 +45,7 @@ You can run the `gh skyline` command with the following flags:
   - Examples: `gh skyline --year 2020`, `gh skyline --year 2014-2024`
 - `-w`, `--web`: Open the GitHub profile for the authenticated or specified user.
   - Example: `gh skyline --web`, `gh skyline --user mona --web`
+- `-a`, `--art-only`: Show the ASCII art preview without generating an STL file.
 
 ### Examples
 
@@ -76,6 +77,12 @@ Generate a skyline from the user's join year to the current year:
 
 ```bash
 gh skyline --full
+```
+
+Generate only the ASCII preview for a skyline:
+
+```bash
+gh skyline --art-only
 ```
 
 Enable debug logging:

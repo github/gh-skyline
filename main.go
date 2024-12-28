@@ -45,6 +45,7 @@ var (
 	full      bool
 	debug     bool
 	web       bool
+	artOnly   bool
 	output    string // new output path flag
 
 	rootCmd = &cobra.Command{
@@ -106,6 +107,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&full, "full", "f", false, "Generate contribution graph from join year to current year")
 	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "Enable debug logging")
 	rootCmd.Flags().BoolVarP(&web, "web", "w", false, "Open GitHub profile (authenticated or specified user).")
+	rootCmd.Flags().BoolVarP(&artOnly, "art-only", "a", false, "Generate only ASCII preview")
 	rootCmd.Flags().StringVarP(&output, "output", "o", "", "Output file path (optional)")
 }
 
@@ -176,7 +178,7 @@ func generateSkyline(startYear, endYear int, targetUser string, full bool) error
 		allContributions = append(allContributions, contributions)
 
 		// Generate ASCII art for each year
-		asciiArt, err := ascii.GenerateASCII(contributions, targetUser, year, year == startYear)
+		asciiArt, err := ascii.GenerateASCII(contributions, targetUser, year, (year == startYear) && !artOnly, !artOnly)
 		if err != nil {
 			if warnErr := log.Warning("Failed to generate ASCII preview: %v", err); warnErr != nil {
 				return warnErr
@@ -202,14 +204,18 @@ func generateSkyline(startYear, endYear int, targetUser string, full bool) error
 		}
 	}
 
-	// Generate filename
-	outputPath := generateOutputFilename(targetUser, startYear, endYear)
+	if !artOnly {
+		// Generate filename
+		outputPath := generateOutputFilename(targetUser, startYear, endYear)
 
-	// Generate the STL file
-	if len(allContributions) == 1 {
-		return stl.GenerateSTL(allContributions[0], outputPath, targetUser, startYear)
+		// Generate the STL file
+		if len(allContributions) == 1 {
+			return stl.GenerateSTL(allContributions[0], outputPath, targetUser, startYear)
+		}
+		return stl.GenerateSTLRange(allContributions, outputPath, targetUser, startYear, endYear)
 	}
-	return stl.GenerateSTLRange(allContributions, outputPath, targetUser, startYear, endYear)
+
+	return nil
 }
 
 // Variable for client initialization - allows for testing
@@ -217,22 +223,22 @@ var initializeGitHubClient = defaultGitHubClient
 
 // defaultGitHubClient is the default implementation of client initialization
 func defaultGitHubClient() (*github.Client, error) {
-	apiClient, err := api.DefaultRESTClient()
+	apiClient, err := api.DefaultGraphQLClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create REST client: %w", err)
+		return nil, fmt.Errorf("failed to create GraphQL client: %w", err)
 	}
 	return github.NewClient(apiClient), nil
 }
 
 // fetchContributionData retrieves and formats the contribution data for the specified year.
 func fetchContributionData(client *github.Client, username string, year int) ([][]types.ContributionDay, error) {
-	resp, err := client.FetchContributions(username, year)
+	response, err := client.FetchContributions(username, year)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch contributions: %w", err)
 	}
 
 	// Convert weeks data to 2D array for STL generation
-	weeks := resp.Data.User.ContributionsCollection.ContributionCalendar.Weeks
+	weeks := response.User.ContributionsCollection.ContributionCalendar.Weeks
 	contributionGrid := make([][]types.ContributionDay, len(weeks))
 	for i, week := range weeks {
 		contributionGrid[i] = week.ContributionDays
