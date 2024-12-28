@@ -39,7 +39,7 @@ func TestFormatYearRange(t *testing.T) {
 			name:      "different years",
 			startYear: 2020,
 			endYear:   2024,
-			want:      "20-24",
+			want:      "2020-24",
 		},
 	}
 
@@ -73,7 +73,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 			user:      "testuser",
 			startYear: 2020,
 			endYear:   2024,
-			want:      "testuser-20-24-github-skyline.stl",
+			want:      "testuser-2020-24-github-skyline.stl",
 		},
 	}
 

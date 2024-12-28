@@ -124,7 +124,8 @@ func formatYearRange(startYear, endYear int) string {
 	if startYear == endYear {
 		return fmt.Sprintf("%d", startYear)
 	}
-	return fmt.Sprintf("%02d-%02d", startYear%100, endYear%100)
+	// Use YYYY-YY format for multi-year ranges
+	return fmt.Sprintf("%04d-%02d", startYear, endYear%100)
 }
 
 // generateOutputFilename creates a consistent filename for the STL output
@@ -192,8 +193,11 @@ func generateSkyline(startYear, endYear int, targetUser string, full bool) error
 				lines := strings.Split(asciiArt, "\n")
 				gridStart := 0
 				for i, line := range lines {
-					if strings.Contains(line, string(ascii.EmptyBlock)) ||
-						strings.Contains(line, string(ascii.FoundationLow)) {
+					containsEmptyBlock := strings.Contains(line, string(ascii.EmptyBlock))
+					containsFoundationLow := strings.Contains(line, string(ascii.FoundationLow))
+					isNotOnlyEmptyBlocks := strings.Trim(line, string(ascii.EmptyBlock)) != ""
+
+					if (containsEmptyBlock || containsFoundationLow) && isNotOnlyEmptyBlocks {
 						gridStart = i
 						break
 					}

@@ -60,7 +60,10 @@ func GenerateASCII(contributionGrid [][]types.ContributionDay, username string, 
 			if day.ContributionCount == -1 {
 				asciiGrid[dayIdx][weekIdx] = FutureBlock
 			} else {
-				normalized := float64(day.ContributionCount) / float64(maxContributions)
+				normalized := 0.0
+				if maxContributions != 0 {
+					normalized = float64(day.ContributionCount) / float64(maxContributions)
+				}
 				asciiGrid[dayIdx][weekIdx] = getBlock(normalized, dayIdx, nonZeroCount)
 			}
 		}

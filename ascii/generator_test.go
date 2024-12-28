@@ -119,3 +119,63 @@ func TestGetBlock(t *testing.T) {
 		})
 	}
 }
+
+// TestGenerateASCIIZeroContributions tests the GenerateASCII function with zero contributions.
+// It verifies that the skyline consists of empty blocks and appropriately handles the header and footer.
+func TestGenerateASCIIZeroContributions(t *testing.T) {
+	tests := []struct {
+		name                   string
+		includeHeaderAndFooter bool
+	}{
+		{
+			name:                   "Zero contributions without header",
+			includeHeaderAndFooter: false,
+		},
+		{
+			name:                   "Zero contributions with header",
+			includeHeaderAndFooter: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a test grid with zero contributions
+			grid := makeTestGrid(3, 7)
+			for i := range grid {
+				for j := range grid[i] {
+					grid[i][j].ContributionCount = 0
+				}
+			}
+
+			// Generate ASCII art
+			result, err := GenerateASCII(grid, "testuser", 2023, tt.includeHeaderAndFooter, tt.includeHeaderAndFooter)
+			if err != nil {
+				t.Fatalf("GenerateASCII() returned an error: %v", err)
+			}
+
+			lines := strings.Split(result, "\n")
+
+			// Determine the starting line of the skyline
+			skylineStart := 0
+			if tt.includeHeaderAndFooter {
+				// Assuming HeaderTemplate has a fixed number of lines
+				headerLines := strings.Count(HeaderTemplate, "\n")
+				skylineStart = headerLines + 1 // +1 for the additional newline after header
+			}
+
+			// Verify the skyline has at least 7 lines
+			if len(lines) < skylineStart+7 {
+				t.Fatalf("Expected at least %d lines for skyline, got %d", skylineStart+7, len(lines))
+			}
+
+			// Check each line of the skyline for empty blocks
+			for i := skylineStart; i < skylineStart+7; i++ {
+				for _, ch := range lines[i] {
+					if ch != EmptyBlock {
+						t.Errorf("Expected empty block in skyline, got '%c' on line %d", ch, i+1)
+					}
+				}
+			}
+		})
+	}
+}
