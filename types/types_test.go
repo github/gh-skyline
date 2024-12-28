@@ -44,23 +44,21 @@ func TestContributionDaySerialization(t *testing.T) {
 // is properly parsed with nested fields.
 func TestContributionsResponseParsing(t *testing.T) {
 	sampleResponse := `{
-		"data": {
-			"user": {
-				"login": "testuser",
-				"contributionsCollection": {
-					"contributionCalendar": {
-						"totalContributions": 100,
-						"weeks": [
-							{
-								"contributionDays": [
-									{
-										"contributionCount": 5,
-										"date": "2024-03-21"
-									}
-								]
-							}
-						]
-					}
+		"user": {
+			"login": "testuser",
+			"contributionsCollection": {
+				"contributionCalendar": {
+					"totalContributions": 100,
+					"weeks": [
+						{
+							"contributionDays": [
+								{
+									"contributionCount": 5,
+									"date": "2024-03-21"
+								}
+							]
+						}
+					]
 				}
 			}
 		}
@@ -75,12 +73,12 @@ func TestContributionsResponseParsing(t *testing.T) {
 	expectedUsername := "testuser"
 	expectedTotalContributions := 100
 
-	if parsedResponse.Data.User.Login != expectedUsername {
-		t.Errorf("username mismatch: got %q, want %q", parsedResponse.Data.User.Login, expectedUsername)
+	if parsedResponse.User.Login != expectedUsername {
+		t.Errorf("username mismatch: got %q, want %q", parsedResponse.User.Login, expectedUsername)
 	}
-	if parsedResponse.Data.User.ContributionsCollection.ContributionCalendar.TotalContributions != expectedTotalContributions {
+	if parsedResponse.User.ContributionsCollection.ContributionCalendar.TotalContributions != expectedTotalContributions {
 		t.Errorf("total contributions mismatch: got %d, want %d",
-			parsedResponse.Data.User.ContributionsCollection.ContributionCalendar.TotalContributions,
+			parsedResponse.User.ContributionsCollection.ContributionCalendar.TotalContributions,
 			expectedTotalContributions)
 	}
 }

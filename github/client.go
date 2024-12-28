@@ -3,10 +3,7 @@
 package github
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/github/gh-skyline/errors"
@@ -15,8 +12,7 @@ import (
 
 // APIClient interface defines the methods we need from the client
 type APIClient interface {
-	Get(path string, response interface{}) error
-	Post(path string, body io.Reader, response interface{}) error
+	Do(query string, variables map[string]interface{}, response interface{}) error
 }
 
 // Client holds the API client
@@ -31,17 +27,31 @@ func NewClient(apiClient APIClient) *Client {
 
 // GetAuthenticatedUser fetches the authenticated user's login name from GitHub.
 func (c *Client) GetAuthenticatedUser() (string, error) {
-	response := struct{ Login string }{}
-	err := c.api.Get("user", &response)
+	// GraphQL query to fetch the authenticated user's login.
+	query := `
+    query {
+        viewer {
+            login
+        }
+    }`
+
+	var response struct {
+		Viewer struct {
+			Login string `json:"login"`
+		} `json:"viewer"`
+	}
+
+	// Execute the GraphQL query.
+	err := c.api.Do(query, nil, &response)
 	if err != nil {
 		return "", errors.New(errors.NetworkError, "failed to fetch authenticated user", err)
 	}
 
-	if response.Login == "" {
+	if response.Viewer.Login == "" {
 		return "", errors.New(errors.ValidationError, "received empty username from GitHub API", nil)
 	}
 
-	return response.Login, nil
+	return response.Viewer.Login, nil
 }
 
 // FetchContributions retrieves the contribution data for a given username and year from GitHub.
@@ -54,9 +64,10 @@ func (c *Client) FetchContributions(username string, year int) (*types.Contribut
 		return nil, errors.New(errors.ValidationError, "year cannot be before GitHub's launch (2008)", nil)
 	}
 
-	startDate := fmt.Sprintf("%d-01-01", year)
-	endDate := fmt.Sprintf("%d-12-31", year)
+	startDate := fmt.Sprintf("%d-01-01T00:00:00Z", year)
+	endDate := fmt.Sprintf("%d-12-31T23:59:59Z", year)
 
+	// GraphQL query to fetch the user's contributions within the specified date range.
 	query := `
     query ContributionGraph($username: String!, $from: DateTime!, $to: DateTime!) {
         user(login: $username) {
@@ -77,34 +88,23 @@ func (c *Client) FetchContributions(username string, year int) (*types.Contribut
 
 	variables := map[string]interface{}{
 		"username": username,
-		"from":     startDate + "T00:00:00Z",
-		"to":       endDate + "T23:59:59Z",
+		"from":     startDate,
+		"to":       endDate,
 	}
 
-	payload := struct {
-		Query     string                 `json:"query"`
-		Variables map[string]interface{} `json:"variables"`
-	}{
-		Query:     query,
-		Variables: variables,
-	}
+	var response types.ContributionsResponse
 
-	body, err := json.Marshal(payload)
+	// Execute the GraphQL query.
+	err := c.api.Do(query, variables, &response)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(errors.NetworkError, "failed to fetch contributions", err)
 	}
 
-	var resp types.ContributionsResponse
-	if err := c.api.Post("graphql", bytes.NewBuffer(body), &resp); err != nil {
-		return nil, errors.New(errors.GraphQLError, "failed to fetch contributions", err)
+	if response.User.Login == "" {
+		return nil, errors.New(errors.ValidationError, "received empty username from GitHub API", nil)
 	}
 
-	// Validate response
-	if resp.Data.User.Login == "" {
-		return nil, errors.New(errors.GraphQLError, "user not found", nil)
-	}
-
-	return &resp, nil
+	return &response, nil
 }
 
 // GetUserJoinYear fetches the year a user joined GitHub using the GitHub API.
@@ -113,6 +113,7 @@ func (c *Client) GetUserJoinYear(username string) (int, error) {
 		return 0, errors.New(errors.ValidationError, "username cannot be empty", nil)
 	}
 
+	// GraphQL query to fetch the user's account creation date.
 	query := `
     query UserJoinDate($username: String!) {
         user(login: $username) {
@@ -124,35 +125,23 @@ func (c *Client) GetUserJoinYear(username string) (int, error) {
 		"username": username,
 	}
 
-	payload := struct {
-		Query     string                 `json:"query"`
-		Variables map[string]interface{} `json:"variables"`
-	}{
-		Query:     query,
-		Variables: variables,
+	var response struct {
+		User struct {
+			CreatedAt time.Time `json:"createdAt"`
+		} `json:"user"`
 	}
 
-	body, err := json.Marshal(payload)
+	// Execute the GraphQL query.
+	err := c.api.Do(query, variables, &response)
 	if err != nil {
-		return 0, err
-	}
-
-	var resp struct {
-		Data struct {
-			User struct {
-				CreatedAt string `json:"createdAt"`
-			} `json:"user"`
-		} `json:"data"`
-	}
-	if err := c.api.Post("graphql", bytes.NewBuffer(body), &resp); err != nil {
-		return 0, errors.New(errors.GraphQLError, "failed to fetch user join date", err)
+		return 0, errors.New(errors.NetworkError, "failed to fetch user's join date", err)
 	}
 
 	// Parse the join date
-	joinDate, err := time.Parse(time.RFC3339, resp.Data.User.CreatedAt)
-	if err != nil {
-		return 0, errors.New(errors.ValidationError, "failed to parse join date", err)
+	joinYear := response.User.CreatedAt.Year()
+	if joinYear == 0 {
+		return 0, errors.New(errors.ValidationError, "invalid join date received from GitHub API", nil)
 	}
 
-	return joinDate.Year(), nil
+	return joinYear, nil
 }

@@ -113,6 +113,10 @@ The extension generates ASCII art in terminal while loading, a unique and fun wa
 - `'▓'` High level: Heavy contribution activity
 - `'╻┃╽'` Top level: Last block with contributions in the week (Low, Medium, High)
 
+## Visualizing your Skyline
+
+Once you have generated your STL file, you can visualize it using 3D modeling or 3D printing software. But did you know that you can upload your STL file to a GitHub repository and view your Skyline there? For example, take a look at [@chrisreddington's GitHub Skyline from 2011 - 2024](https://github.com/chrisreddington/chrisreddington/blob/master/chrisreddington-11-24-github-skyline.stl).
+
 ## Project Structure
 
 ```text

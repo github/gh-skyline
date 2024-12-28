@@ -1,8 +1,8 @@
 # Contributing
 
-[fork]: https://github.com/github/REPO/fork
-[pr]: https://github.com/github/REPO/compare
-[style]: https://github.com/github/REPO/blob/main/.golangci.yaml
+[fork]: https://github.com/github/gh-skyline/fork
+[pr]: https://github.com/github/gh-skyline/compare
+[style]: https://github.com/github/gh-skyline/blob/main/.github/linters/.golangci.yml
 
 Hi there! We're thrilled that you'd like to contribute to this project. Your help is essential for keeping it great.
 
@@ -34,10 +34,10 @@ The environment will be ready to use in a few minutes.
 
 ### Local development environment
 
-These are one time installations required to be able to test your changes locally as part of the pull request (PR) submission process.
+These are one-time installations required to be able to test your changes locally as part of the pull request (PR) submission process.
 
 1. install Go [through download](https://go.dev/doc/install) | [through Homebrew](https://formulae.brew.sh/formula/go)
-1. [install golangci-lint](https://golangci-lint.run/usage/install/#local-installation)
+1. [install golangci-lint](https://golangci-lint.run/welcome/install/#local-installation)
 
 ### Building the extension
 

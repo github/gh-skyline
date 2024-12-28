@@ -217,22 +217,22 @@ var initializeGitHubClient = defaultGitHubClient
 
 // defaultGitHubClient is the default implementation of client initialization
 func defaultGitHubClient() (*github.Client, error) {
-	apiClient, err := api.DefaultRESTClient()
+	apiClient, err := api.DefaultGraphQLClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create REST client: %w", err)
+		return nil, fmt.Errorf("failed to create GraphQL client: %w", err)
 	}
 	return github.NewClient(apiClient), nil
 }
 
 // fetchContributionData retrieves and formats the contribution data for the specified year.
 func fetchContributionData(client *github.Client, username string, year int) ([][]types.ContributionDay, error) {
-	resp, err := client.FetchContributions(username, year)
+	response, err := client.FetchContributions(username, year)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch contributions: %w", err)
 	}
 
 	// Convert weeks data to 2D array for STL generation
-	weeks := resp.Data.User.ContributionsCollection.ContributionCalendar.Weeks
+	weeks := response.User.ContributionsCollection.ContributionCalendar.Weeks
 	contributionGrid := make([][]types.ContributionDay, len(weeks))
 	for i, week := range weeks {
 		contributionGrid[i] = week.ContributionDays

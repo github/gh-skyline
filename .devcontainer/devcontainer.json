@@ -14,7 +14,6 @@
         "github.copilot-workspace",
         "GitHub.vscode-pull-request-github",
         "GitHub.remotehub",
-        "GitHub.vscode-codeql",
         "golang.Go"
       ]
     }
