@@ -33,7 +33,7 @@ type textRenderConfig struct {
 type imageRenderConfig struct {
 	renderConfig
 	imagePath string
-	height    float64
+	width    float64
 }
 
 const (
@@ -56,7 +56,7 @@ const (
 	yearFontSize      = 56.0
 	yearZOffset       = 0.4
 
-	defaultImageHeight = 9.0
+	defaultImageWidth  = 9.2
 	defaultImageScale  = 0.8
 	imageLeftMargin    = 10.0
 )
@@ -180,7 +180,7 @@ func GenerateImageGeometry(innerWidth, baseHeight float64) ([]types.Triangle, er
 			depth:      frontEmbedDepth,
 		},
 		imagePath: imgPath,
-		height:    defaultImageHeight,
+		width:    defaultImageWidth,
 	}
 
 	defer cleanup()
@@ -211,7 +211,7 @@ func renderImage(config imageRenderConfig) ([]types.Triangle, error) {
 	width := bounds.Max.X
 	height := bounds.Max.Y
 
-	scale := config.height / float64(height)
+	scale := config.width / float64(width)
 
 	var triangles []types.Triangle
 
