@@ -38,7 +38,7 @@ type imageRenderConfig struct {
 
 const (
 	imagePosition = 0.025
-	textPadding   = 0.1 // 10%
+	gap           = 0.05 // 5%
 
 	defaultContextWidth  = 800
 	defaultContextHeight = 200
@@ -69,7 +69,7 @@ func Create3DText(username string, year string, innerWidth, baseHeight float64) 
 
 	usernameConfig := textRenderConfig{
 		renderConfig: renderConfig{
-			startX:     innerWidth * textPadding,
+			startX:     innerWidth*(2*gap) + defaultImageWidth*defaultImageScale,
 			startY:     -textDepthOffset / 2,
 			startZ:     baseHeight * usernameZOffset,
 			voxelScale: textVoxelSize,
@@ -82,9 +82,10 @@ func Create3DText(username string, year string, innerWidth, baseHeight float64) 
 		alignment:     gg.AlignLeft,
 	}
 
+	yearStartX := innerWidth*(1-gap) - (yearContextWidth*textVoxelSize*0.75/8)
 	yearConfig := textRenderConfig{
 		renderConfig: renderConfig{
-			startX:     innerWidth*(1-textPadding) - 75,
+			startX:     yearStartX,
 			startY:     -textDepthOffset / 2,
 			startZ:     baseHeight * yearZOffset,
 			voxelScale: textVoxelSize * 0.75,
@@ -173,7 +174,7 @@ func GenerateImageGeometry(innerWidth, baseHeight float64) ([]types.Triangle, er
 
 	config := imageRenderConfig{
 		renderConfig: renderConfig{
-			startX:     innerWidth * imagePosition,
+			startX:     innerWidth * gap,
 			startY:     -frontEmbedDepth / 2.0,
 			startZ:     -0.85 * baseHeight,
 			voxelScale: defaultImageScale,
