@@ -135,7 +135,8 @@ func renderText(config textRenderConfig) ([]types.Triangle, error) {
 
 	for y := 0; y < config.contextHeight; y++ {
 		for x := 0; x < config.contextWidth; x++ {
-			if isPixelActive(dc, x, y) {
+			intensity := calculatePixelIntensity(dc, x, y)
+			if intensity > 0 {
 				xPos := config.startX + float64(x)*config.voxelScale/8
 				zPos := config.startZ - float64(y)*config.voxelScale/8
 
@@ -144,7 +145,7 @@ func renderText(config textRenderConfig) ([]types.Triangle, error) {
 					config.startY,
 					zPos,
 					config.voxelScale/2,
-					config.depth,
+					config.depth*intensity,
 					config.voxelScale/2,
 				)
 				if err != nil {
@@ -216,7 +217,8 @@ func renderImage(config imageRenderConfig) ([]types.Triangle, error) {
 	for y := height - 1; y >= 0; y-- {
 		for x := 0; x < width; x++ {
 			r, _, _, a := img.At(x, y).RGBA()
-			if a > 32768 && r > 32768 {
+			intensity := float64(r) / 65535.0
+			if a > 32768 && intensity > 0 {
 				xPos := config.startX + float64(x)*config.voxelScale*scale
 				zPos := config.startZ + float64(height-1-y)*config.voxelScale*scale
 
@@ -225,7 +227,7 @@ func renderImage(config imageRenderConfig) ([]types.Triangle, error) {
 					config.startY,
 					zPos,
 					config.voxelScale*scale,
-					config.depth,
+					config.depth*intensity,
 					config.voxelScale*scale,
 				)
 
@@ -241,8 +243,17 @@ func renderImage(config imageRenderConfig) ([]types.Triangle, error) {
 	return triangles, nil
 }
 
-// isPixelActive checks if a pixel is active (white) in the given context.
-func isPixelActive(dc *gg.Context, x, y int) bool {
-	r, _, _, _ := dc.Image().At(x, y).RGBA()
-	return r > 32768
+// calculatePixelIntensity returns the intensity of a pixel at the given coordinates
+// as a float64 value between 0.0 (black) and 1.0 (white).
+func calculatePixelIntensity(dc *gg.Context, x, y int) float64 {
+	// Get RGB values from pixel
+	r, g, b, _ := dc.Image().At(x, y).RGBA()
+
+	// Convert to grayscale
+	gray := 0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b)
+
+	// Normalize to 0-1 range (RGBA values are in 0-65535 range)
+	intensity := gray / 65535.0
+
+	return intensity
 }
