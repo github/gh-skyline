@@ -71,12 +71,12 @@ func createBox(x, y, z, width, height, depth float64) ([]types.Triangle, error) 
 
 	vertices := make([]types.Point3D, 8) // Pre-allocate vertices array
 	quads := [6][4]int{
-		{0, 1, 2, 3}, // front
-		{5, 4, 7, 6}, // back
-		{4, 0, 3, 7}, // left
-		{1, 5, 6, 2}, // right
-		{3, 2, 6, 7}, // top
-		{4, 5, 1, 0}, // bottom
+		{0, 3, 2, 1}, // front (viewed from front)
+		{5, 6, 7, 4}, // back (viewed from back)
+		{4, 7, 3, 0}, // left (viewed from left)
+		{1, 2, 6, 5}, // right (viewed from right)
+		{3, 7, 6, 2}, // top (viewed from top)
+		{4, 0, 1, 5}, // bottom (viewed from bottom)
 	}
 
 	// Fill vertices array

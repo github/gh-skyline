@@ -45,6 +45,7 @@ var (
 	full      bool
 	debug     bool
 	web       bool
+	artOnly   bool
 	output    string // new output path flag
 
 	rootCmd = &cobra.Command{
@@ -106,6 +107,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&full, "full", "f", false, "Generate contribution graph from join year to current year")
 	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "Enable debug logging")
 	rootCmd.Flags().BoolVarP(&web, "web", "w", false, "Open GitHub profile (authenticated or specified user).")
+	rootCmd.Flags().BoolVarP(&artOnly, "art-only", "a", false, "Generate only ASCII preview")
 	rootCmd.Flags().StringVarP(&output, "output", "o", "", "Output file path (optional)")
 }
 
@@ -122,7 +124,8 @@ func formatYearRange(startYear, endYear int) string {
 	if startYear == endYear {
 		return fmt.Sprintf("%d", startYear)
 	}
-	return fmt.Sprintf("%02d-%02d", startYear%100, endYear%100)
+	// Use YYYY-YY format for multi-year ranges
+	return fmt.Sprintf("%04d-%02d", startYear, endYear%100)
 }
 
 // generateOutputFilename creates a consistent filename for the STL output
@@ -176,7 +179,7 @@ func generateSkyline(startYear, endYear int, targetUser string, full bool) error
 		allContributions = append(allContributions, contributions)
 
 		// Generate ASCII art for each year
-		asciiArt, err := ascii.GenerateASCII(contributions, targetUser, year, year == startYear)
+		asciiArt, err := ascii.GenerateASCII(contributions, targetUser, year, (year == startYear) && !artOnly, !artOnly)
 		if err != nil {
 			if warnErr := log.Warning("Failed to generate ASCII preview: %v", err); warnErr != nil {
 				return warnErr
@@ -190,8 +193,11 @@ func generateSkyline(startYear, endYear int, targetUser string, full bool) error
 				lines := strings.Split(asciiArt, "\n")
 				gridStart := 0
 				for i, line := range lines {
-					if strings.Contains(line, string(ascii.EmptyBlock)) ||
-						strings.Contains(line, string(ascii.FoundationLow)) {
+					containsEmptyBlock := strings.Contains(line, string(ascii.EmptyBlock))
+					containsFoundationLow := strings.Contains(line, string(ascii.FoundationLow))
+					isNotOnlyEmptyBlocks := strings.Trim(line, string(ascii.EmptyBlock)) != ""
+
+					if (containsEmptyBlock || containsFoundationLow) && isNotOnlyEmptyBlocks {
 						gridStart = i
 						break
 					}
@@ -202,14 +208,18 @@ func generateSkyline(startYear, endYear int, targetUser string, full bool) error
 		}
 	}
 
-	// Generate filename
-	outputPath := generateOutputFilename(targetUser, startYear, endYear)
+	if !artOnly {
+		// Generate filename
+		outputPath := generateOutputFilename(targetUser, startYear, endYear)
 
-	// Generate the STL file
-	if len(allContributions) == 1 {
-		return stl.GenerateSTL(allContributions[0], outputPath, targetUser, startYear)
+		// Generate the STL file
+		if len(allContributions) == 1 {
+			return stl.GenerateSTL(allContributions[0], outputPath, targetUser, startYear)
+		}
+		return stl.GenerateSTLRange(allContributions, outputPath, targetUser, startYear, endYear)
 	}
-	return stl.GenerateSTLRange(allContributions, outputPath, targetUser, startYear, endYear)
+
+	return nil
 }
 
 // Variable for client initialization - allows for testing

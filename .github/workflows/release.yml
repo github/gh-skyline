@@ -15,5 +15,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: cli/gh-extension-precompile@561b19deda1228a0edf856c3325df87416f8c9bd # v2.0.0
         with:
+          release_android: true
+          # For more information see: https://developer.android.com/tools/releases/platforms
+          # At the time of writing, 35 had just come out of beta and 34 seems to be the most stable.
+          android_sdk_version: 34
           generate_attestations: true
           go_version_file: go.mod
