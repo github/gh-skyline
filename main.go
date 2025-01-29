@@ -29,7 +29,7 @@ type Browser interface {
 type GitHubClientInterface interface {
 	GetAuthenticatedUser() (string, error)
 	GetUserJoinYear(username string) (int, error)
-	FetchContributions(username string, year int) (*types.ContributionsResponse, error)
+	FetchContributions(username string, year int, startDate string, endDate string) (*types.ContributionsResponse, error)
 }
 
 // Constants for GitHub launch year and default output file format
@@ -40,6 +40,8 @@ const (
 
 // Command line variables and root command configuration
 var (
+	startDate string
+	endDate   string
 	yearRange string
 	user      string
 	full      bool
@@ -95,7 +97,7 @@ to create a "building" effect, with empty spaces (no contributions) at the top.`
 				return fmt.Errorf("invalid year range: %v", err)
 			}
 
-			return generateSkyline(startYear, endYear, user, full)
+			return generateSkyline(startYear, endYear, user, full, startDate, endDate)
 		},
 	}
 )
@@ -109,10 +111,14 @@ func init() {
 	rootCmd.Flags().BoolVarP(&web, "web", "w", false, "Open GitHub profile (authenticated or specified user).")
 	rootCmd.Flags().BoolVarP(&artOnly, "art-only", "a", false, "Generate only ASCII preview")
 	rootCmd.Flags().StringVarP(&output, "output", "o", "", "Output file path (optional)")
+	rootCmd.Flags().StringVarP(&startDate, "start-date", "s", "", "Start date for the contribution history")
+	rootCmd.Flags().StringVarP(&endDate, "end-date", "e", "", "End date for the contribution history")
 }
+
 
 // main initializes and executes the root command for the GitHub Skyline CLI
 func main() {
+	fmt.Fprintf(os.Stdout, "Hello, World!")
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -129,7 +135,7 @@ func formatYearRange(startYear, endYear int) string {
 }
 
 // generateOutputFilename creates a consistent filename for the STL output
-func generateOutputFilename(user string, startYear, endYear int) string {
+func generateOutputFilename(user string, startYear, endYear int, startDate string, endDate string) string {
 	if output != "" {
 		// Ensure the filename ends with .stl
 		if !strings.HasSuffix(strings.ToLower(output), ".stl") {
@@ -138,11 +144,14 @@ func generateOutputFilename(user string, startYear, endYear int) string {
 		return output
 	}
 	yearStr := formatYearRange(startYear, endYear)
+	if startDate != "" || endDate != "" {
+		yearStr = fmt.Sprintf("%s-%s", startDate, endDate)
+	}
 	return fmt.Sprintf(outputFileFormat, user, yearStr)
 }
 
 // generateSkyline creates a 3D model with ASCII art preview of GitHub contributions for the specified year range, or "full lifetime" of the user
-func generateSkyline(startYear, endYear int, targetUser string, full bool) error {
+func generateSkyline(startYear, endYear int, targetUser string, full bool, startDate, endDate string) error {
 	log := logger.GetLogger()
 
 	client, err := initializeGitHubClient()
@@ -170,9 +179,65 @@ func generateSkyline(startYear, endYear int, targetUser string, full bool) error
 		endYear = time.Now().Year()
 	}
 
+	// print start and end dates
+	log.Debug("Start date: %s", startDate)
+	log.Debug("End date: %s", endDate)
+
+	// boolean variable to check if startDate and endDate are provided
+	dateProvided := startDate != "" || endDate != ""
+	parsedStartDate, parsedEndDate := time.Time{}, time.Time{}
+
+	if startDate != "" || endDate != "" {
+		// parse startDate and endDate, it will be in DD-MM-YYYY format
+		parsedStartDate, err = time.Parse("02-01-2006", startDate)
+		if err != nil {
+			return fmt.Errorf("failed to parse start date: %w", err)
+		}
+		parsedEndDate, err = time.Parse("02-01-2006", endDate)
+		if err != nil {
+			return fmt.Errorf("failed to parse end date: %w", err)
+		}
+
+		// check if start date is after end date
+		if parsedStartDate.After(parsedEndDate) {
+			return fmt.Errorf("start date cannot be after end date")
+		}
+
+		// check if start date is before join year
+		joinYear, err := client.GetUserJoinYear(targetUser)
+		if err != nil {
+			return errors.New(errors.NetworkError, "failed to get user join year", err)
+		}
+		if parsedStartDate.Year() < joinYear {
+			return fmt.Errorf("start date cannot be before join year")
+		}
+
+		// check if end date is after current year
+		if parsedEndDate.Year() > time.Now().Year() {
+			return fmt.Errorf("end date cannot be after current year")
+		}
+
+		// set startYear and endYear to the parsed dates
+		startYear = parsedStartDate.Year()
+		endYear = parsedEndDate.Year()
+	}
+
 	var allContributions [][][]types.ContributionDay
 	for year := startYear; year <= endYear; year++ {
-		contributions, err := fetchContributionData(client, targetUser, year)
+		contributions := make([][]types.ContributionDay, 5)
+		if dateProvided {
+			if ( startYear == endYear ) {
+				contributions, err = fetchContributionData(client, targetUser, year, startDate, endDate);
+			} else if ( year == startYear ) {
+				contributions, err = fetchContributionData(client, targetUser, year, startDate, "");
+			} else if ( year == endYear ) {
+				contributions, err = fetchContributionData(client, targetUser, year, "", endDate);
+			} else {
+				contributions, err = fetchContributionData(client, targetUser, year, "", "");
+			}
+		} else {
+			contributions, err = fetchContributionData(client, targetUser, year, "", "");
+		}
 		if err != nil {
 			return err
 		}
@@ -210,7 +275,7 @@ func generateSkyline(startYear, endYear int, targetUser string, full bool) error
 
 	if !artOnly {
 		// Generate filename
-		outputPath := generateOutputFilename(targetUser, startYear, endYear)
+		outputPath := generateOutputFilename(targetUser, startYear, endYear, startDate, endDate)
 
 		// Generate the STL file
 		if len(allContributions) == 1 {
@@ -235,8 +300,28 @@ func defaultGitHubClient() (*github.Client, error) {
 }
 
 // fetchContributionData retrieves and formats the contribution data for the specified year.
-func fetchContributionData(client *github.Client, username string, year int) ([][]types.ContributionDay, error) {
-	response, err := client.FetchContributions(username, year)
+func fetchContributionData(client *github.Client, username string, year int, startDate string, endDate string) ([][]types.ContributionDay, error) {
+	if startDate == "" {
+		startDate = fmt.Sprintf("%d-01-01T00:00:00Z", year)
+	} else {
+		// given date is in DD-MM-YYYY format, convert it to YYYY-MM-DD format
+		parsedStartDate, err := time.Parse("02-01-2006", startDate)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse start date: %w", err)
+		}
+		startDate = fmt.Sprintf("%d-%02d-%02dT00:00:00Z", parsedStartDate.Year(), parsedStartDate.Month(), parsedStartDate.Day())
+	}
+	if endDate == "" {
+		endDate = fmt.Sprintf("%d-12-31T23:59:59Z", year)
+	} else {
+		// given date is in DD-MM-YYYY format, convert it to YYYY-MM-DD format
+		parsedEndDate, err := time.Parse("02-01-2006", endDate)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse end date: %w", err)
+		}
+		endDate = fmt.Sprintf("%d-%02d-%02dT23:59:59Z", parsedEndDate.Year(), parsedEndDate.Month(), parsedEndDate.Day())
+	}
+	response, err := client.FetchContributions(username, year, startDate, endDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch contributions: %w", err)
 	}

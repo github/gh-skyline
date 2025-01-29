@@ -3,7 +3,6 @@
 package github
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/github/gh-skyline/errors"
@@ -55,7 +54,7 @@ func (c *Client) GetAuthenticatedUser() (string, error) {
 }
 
 // FetchContributions retrieves the contribution data for a given username and year from GitHub.
-func (c *Client) FetchContributions(username string, year int) (*types.ContributionsResponse, error) {
+func (c *Client) FetchContributions(username string, year int, startDate string, endDate string) (*types.ContributionsResponse, error) {
 	if username == "" {
 		return nil, errors.New(errors.ValidationError, "username cannot be empty", nil)
 	}
@@ -64,8 +63,8 @@ func (c *Client) FetchContributions(username string, year int) (*types.Contribut
 		return nil, errors.New(errors.ValidationError, "year cannot be before GitHub's launch (2008)", nil)
 	}
 
-	startDate := fmt.Sprintf("%d-01-01T00:00:00Z", year)
-	endDate := fmt.Sprintf("%d-12-31T23:59:59Z", year)
+	// startDate := fmt.Sprintf("%d-01-01T00:00:00Z", year)
+	// endDate := fmt.Sprintf("%d-12-31T23:59:59Z", year)
 
 	// GraphQL query to fetch the user's contributions within the specified date range.
 	query := `
