@@ -19,13 +19,15 @@ import (
 
 // Command line variables and root command configuration
 var (
-	yearRange string
-	user      string
-	full      bool
-	debug     bool
-	web       bool
-	artOnly   bool
-	output    string // new output path flag
+	yearRange  string
+	user       string
+	full       bool
+	debug      bool
+	web        bool
+	artOnly    bool
+	output     string
+	yearToDate bool   // renamed from ytd
+	until      string // renamed from ytdEnd
 )
 
 // rootCmd is the root command for the GitHub Skyline CLI tool.
@@ -47,7 +49,20 @@ ASCII Preview Legend:
 
 Layout:
 Each column represents one week. Days within each week are reordered vertically
-to create a "building" effect, with empty spaces (no contributions) at the top.`,
+to create a "building" effect, with empty spaces (no contributions) at the top.
+
+Examples:
+  # Generate skyline for current year
+  gh skyline
+
+  # Generate skyline for a specific year
+  gh skyline --year 2023
+
+  # Generate skyline for the last 12 months up to today
+  gh skyline --year-to-date
+
+  # Generate skyline for the last 12 months up to a specific date
+  gh skyline --year-to-date --until 2024-02-29`,
 	RunE: handleSkylineCommand,
 }
 
@@ -74,6 +89,21 @@ func initFlags() {
 	flags.BoolVarP(&web, "web", "w", false, "Open GitHub profile (authenticated or specified user).")
 	flags.BoolVarP(&artOnly, "art-only", "a", false, "Generate only ASCII preview")
 	flags.StringVarP(&output, "output", "o", "", "Output file path (optional)")
+	flags.BoolVar(&yearToDate, "year-to-date", false, "Generate contribution graph for the last 12 months")
+	flags.StringVar(&until, "until", "", "End date for year-to-date period in YYYY-MM-DD format (defaults to today)")
+
+	// Mark mutually exclusive flags
+	rootCmd.MarkFlagsMutuallyExclusive("year", "year-to-date")
+	rootCmd.MarkFlagsMutuallyExclusive("year", "full")
+	rootCmd.MarkFlagsMutuallyExclusive("full", "year-to-date")
+
+	// Add validation to ensure --until is only used with --year-to-date
+	rootCmd.PreRunE = func(cmd *cobra.Command, _ []string) error {
+		if cmd.Flags().Changed("until") && !yearToDate {
+			return fmt.Errorf("--until can only be used with --year-to-date")
+		}
+		return nil
+	}
 }
 
 // executeRootCmd is the main execution function for the root command.
@@ -100,12 +130,32 @@ func handleSkylineCommand(_ *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	if yearToDate {
+		// Parse custom end date if provided
+		now := time.Now()
+		endDate := now
+		if until != "" {
+			parsedEnd, err := time.Parse("2006-01-02", until)
+			if err != nil {
+				return fmt.Errorf("invalid until date format, expected YYYY-MM-DD: %v", err)
+			}
+			if parsedEnd.After(now) {
+				return fmt.Errorf("until date cannot be in the future")
+			}
+			endDate = parsedEnd
+		}
+
+		// Calculate start date as 12 months before end date
+		startDate := endDate.AddDate(0, -12, 0)
+		yearRange = fmt.Sprintf("%d-%d", startDate.Year(), endDate.Year())
+	}
+
 	startYear, endYear, err := utils.ParseYearRange(yearRange)
 	if err != nil {
 		return fmt.Errorf("invalid year range: %v", err)
 	}
 
-	return skyline.GenerateSkyline(startYear, endYear, user, full, output, artOnly)
+	return skyline.GenerateSkyline(startYear, endYear, user, full, output, artOnly, until)
 }
 
 // Browser interface matches browser.Browser functionality.

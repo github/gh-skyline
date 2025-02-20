@@ -166,7 +166,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GenerateOutputFilename(tt.user, tt.startYear, tt.endYear, tt.output)
+			got := GenerateOutputFilename(tt.user, tt.startYear, tt.endYear, tt.output, "")
 			if got != tt.want {
 				t.Errorf("generateOutputFilename() = %v, want %v", got, tt.want)
 			}

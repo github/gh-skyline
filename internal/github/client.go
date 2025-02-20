@@ -3,7 +3,6 @@
 package github
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/github/gh-skyline/internal/errors"
@@ -64,8 +63,31 @@ func (c *Client) FetchContributions(username string, year int) (*types.Contribut
 		return nil, errors.New(errors.ValidationError, "year cannot be before GitHub's launch (2008)", nil)
 	}
 
-	startDate := fmt.Sprintf("%d-01-01T00:00:00Z", year)
-	endDate := fmt.Sprintf("%d-12-31T23:59:59Z", year)
+	// Calculate start and end dates
+	now := time.Now()
+	startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(year, 12, 31, 23, 59, 59, 0, time.UTC)
+
+	// If fetching current year, only get contributions up to now
+	if year == now.Year() {
+		endDate = now
+	}
+
+	return c.FetchContributionsForDateRange(username, startDate, endDate)
+}
+
+// FetchContributionsForDateRange retrieves contribution data for a custom date range.
+func (c *Client) FetchContributionsForDateRange(username string, from, to time.Time) (*types.ContributionsResponse, error) {
+	if username == "" {
+		return nil, errors.New(errors.ValidationError, "username cannot be empty", nil)
+	}
+
+	if from.After(to) {
+		return nil, errors.New(errors.ValidationError, "start date must be before end date", nil)
+	}
+
+	startDate := from.Format("2006-01-02T15:04:05Z")
+	endDate := to.Format("2006-01-02T15:04:05Z")
 
 	// GraphQL query to fetch the user's contributions within the specified date range.
 	query := `

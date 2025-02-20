@@ -72,7 +72,7 @@ func TestGenerateSkyline(t *testing.T) {
 				return github.NewClient(tt.mockClient), nil
 			}
 
-			err := GenerateSkyline(tt.startYear, tt.endYear, tt.targetUser, tt.full, "", false)
+			err := GenerateSkyline(tt.startYear, tt.endYear, tt.targetUser, tt.full, "", false, "")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GenerateSkyline() error = %v, wantErr %v", err, tt.wantErr)
 			}

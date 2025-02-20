@@ -62,15 +62,31 @@ func FormatYearRange(startYear, endYear int) string {
 	return fmt.Sprintf("%04d-%02d", startYear, endYear%100)
 }
 
-// GenerateOutputFilename creates a consistent filename for the STL output
-func GenerateOutputFilename(user string, startYear, endYear int, output string) string {
-	if output != "" {
-		// Ensure the filename ends with .stl
-		if !strings.HasSuffix(strings.ToLower(output), ".stl") {
-			return output + ".stl"
-		}
-		return output
+// GenerateOutputFilename creates a filename for the STL output based on the user and year range.
+func GenerateOutputFilename(username string, startYear, endYear int, customPath string, ytdEnd string) string {
+	if customPath != "" {
+		return customPath
 	}
-	yearStr := FormatYearRange(startYear, endYear)
-	return fmt.Sprintf(outputFileFormat, user, yearStr)
+
+	now := time.Now()
+	isYTD := endYear == now.Year() && startYear == now.AddDate(0, -12, 0).Year()
+
+	var filename string
+	switch {
+	case isYTD:
+		// For YTD mode, use a date range format
+		endDate := now
+		if ytdEnd != "" {
+			if parsed, err := time.Parse("2006-01-02", ytdEnd); err == nil {
+				endDate = parsed
+			}
+		}
+		filename = fmt.Sprintf("%s-contributions-ytd-%s.stl", username, endDate.Format("2006-01-02"))
+	case startYear == endYear:
+		filename = fmt.Sprintf("%s-contributions-%d.stl", username, startYear)
+	default:
+		filename = fmt.Sprintf("%s-contributions-%d-%d.stl", username, startYear, endYear)
+	}
+
+	return filename
 }
