@@ -26,8 +26,8 @@ var (
 	web        bool
 	artOnly    bool
 	output     string
-	yearToDate bool   // renamed from ytd
-	until      string // renamed from ytdEnd
+	yearToDate bool
+	until      string
 )
 
 // rootCmd is the root command for the GitHub Skyline CLI tool.
