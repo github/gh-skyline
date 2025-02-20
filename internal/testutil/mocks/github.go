@@ -49,6 +49,23 @@ func (m *MockGitHubClient) FetchContributions(username string, year int) (*types
 	return fixtures.GenerateContributionsResponse(username, year), nil
 }
 
+// FetchContributionsForDateRange implements GitHubClientInterface
+func (m *MockGitHubClient) FetchContributionsForDateRange(username string, from, to time.Time) (*types.ContributionsResponse, error) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	if username == "" {
+		return nil, fmt.Errorf("username cannot be empty")
+	}
+	if from.After(to) {
+		return nil, fmt.Errorf("start date must be before end date")
+	}
+	if m.MockData != nil {
+		return m.MockData, nil
+	}
+	return fixtures.GenerateContributionsResponse(username, from.Year()), nil
+}
+
 // Do implements APIClient
 func (m *MockGitHubClient) Do(_ string, _ map[string]interface{}, response interface{}) error {
 	if m.Err != nil {
