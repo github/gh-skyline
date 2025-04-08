@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/github/gh-skyline/internal/testutil/mocks"
 )
@@ -34,11 +35,138 @@ func TestRootCmd(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	flags := rootCmd.Flags()
-	expectedFlags := []string{"year", "user", "full", "debug", "web", "art-only", "output"}
+	expectedFlags := []string{
+		"year",
+		"user",
+		"full",
+		"debug",
+		"web",
+		"art-only",
+		"output",
+		"year-to-date",
+		"until",
+	}
 	for _, flag := range expectedFlags {
 		if flags.Lookup(flag) == nil {
 			t.Errorf("expected flag %s to be initialized", flag)
 		}
+	}
+}
+
+func TestMutuallyExclusiveFlags(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+	}{
+		{
+			name:    "year and year-to-date are mutually exclusive",
+			args:    []string{"--year", "2024", "--year-to-date"},
+			wantErr: true,
+		},
+		{
+			name:    "year and full are mutually exclusive",
+			args:    []string{"--year", "2024", "--full"},
+			wantErr: true,
+		},
+		{
+			name:    "full and year-to-date are mutually exclusive",
+			args:    []string{"--full", "--year-to-date"},
+			wantErr: true,
+		},
+		{
+			name:    "until requires year-to-date",
+			args:    []string{"--until", "2024-03-21"},
+			wantErr: true,
+		},
+		{
+			name:    "valid year-to-date with until",
+			args:    []string{"--year-to-date", "--until", "2024-03-21"},
+			wantErr: false,
+		},
+		{
+			name:    "valid single year",
+			args:    []string{"--year", "2024"},
+			wantErr: false,
+		},
+		{
+			name:    "valid year-to-date",
+			args:    []string{"--year-to-date"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := rootCmd
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestYearToDatePeriodCalculation(t *testing.T) {
+	tests := []struct {
+		name          string
+		untilDate     string
+		wantStartYear int
+		wantEndYear   int
+		wantErr       bool
+	}{
+		{
+			name:          "default to current date",
+			untilDate:     "",
+			wantStartYear: time.Now().AddDate(0, -12, 0).Year(),
+			wantEndYear:   time.Now().Year(),
+			wantErr:       false,
+		},
+		{
+			name:          "specific date in current year",
+			untilDate:     time.Now().Format("2006-01-02"),
+			wantStartYear: time.Now().AddDate(0, -12, 0).Year(),
+			wantEndYear:   time.Now().Year(),
+			wantErr:       false,
+		},
+		{
+			name:          "invalid date format",
+			untilDate:     "2024/03/21",
+			wantStartYear: 0,
+			wantEndYear:   0,
+			wantErr:       true,
+		},
+		{
+			name:          "future date",
+			untilDate:     time.Now().AddDate(0, 1, 0).Format("2006-01-02"),
+			wantStartYear: 0,
+			wantEndYear:   0,
+			wantErr:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset flags before each test
+			yearToDate = true
+			until = tt.untilDate
+			yearRange = ""
+
+			err := handleSkylineCommand(rootCmd, nil)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("handleSkylineCommand() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr {
+				// Check if the yearRange was set correctly
+				expectedYearRange := fmt.Sprintf("%d-%d", tt.wantStartYear, tt.wantEndYear)
+				if yearRange != expectedYearRange {
+					t.Errorf("yearRange = %v, want %v", yearRange, expectedYearRange)
+				}
+			}
+		})
 	}
 }
 
