@@ -23,7 +23,8 @@ type GitHubClientInterface interface {
 	FetchContributions(username string, year int) (*types.ContributionsResponse, error)
 }
 
-// GenerateSkyline creates a 3D model with ASCII art preview of GitHub contributions for the specified year range, or "full lifetime" of the user
+// GenerateSkyline creates a 3D model with ASCII art preview of GitHub contributions for the specified year range, or "full lifetime" of the user.
+// The 'label' parameter customizes the display name in the output; if left empty, it defaults to the targetUser.
 func GenerateSkyline(startYear, endYear int, targetUser string, label string, full bool, output string, artOnly bool) error {
 	log := logger.GetLogger()
 
