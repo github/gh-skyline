@@ -23,8 +23,9 @@ type GitHubClientInterface interface {
 	FetchContributions(username string, year int) (*types.ContributionsResponse, error)
 }
 
-// GenerateSkyline creates a 3D model with ASCII art preview of GitHub contributions for the specified year range, or "full lifetime" of the user
-func GenerateSkyline(startYear, endYear int, targetUser string, full bool, output string, artOnly bool) error {
+// GenerateSkyline creates a 3D model with ASCII art preview of GitHub contributions for the specified year range, or "full lifetime" of the user.
+// The 'label' parameter customizes the display name in the output; if left empty, it defaults to the targetUser.
+func GenerateSkyline(startYear, endYear int, targetUser string, label string, full bool, output string, artOnly bool) error {
 	log := logger.GetLogger()
 
 	client, err := github.InitializeGitHubClient()
@@ -41,6 +42,9 @@ func GenerateSkyline(startYear, endYear int, targetUser string, full bool, outpu
 			return errors.New(errors.NetworkError, "failed to get authenticated user", err)
 		}
 		targetUser = username
+	}
+	if label == "" {
+		label = targetUser
 	}
 
 	if full {
@@ -61,7 +65,7 @@ func GenerateSkyline(startYear, endYear int, targetUser string, full bool, outpu
 		allContributions = append(allContributions, contributions)
 
 		// Generate ASCII art for each year
-		asciiArt, err := ascii.GenerateASCII(contributions, targetUser, year, (year == startYear) && !artOnly, !artOnly)
+		asciiArt, err := ascii.GenerateASCII(contributions, label, year, (year == startYear) && !artOnly, !artOnly)
 		if err != nil {
 			if warnErr := log.Warning("Failed to generate ASCII preview: %v", err); warnErr != nil {
 				return warnErr
@@ -96,9 +100,9 @@ func GenerateSkyline(startYear, endYear int, targetUser string, full bool, outpu
 
 		// Generate the STL file
 		if len(allContributions) == 1 {
-			return stl.GenerateSTL(allContributions[0], outputPath, targetUser, startYear)
+			return stl.GenerateSTL(allContributions[0], outputPath, label, startYear)
 		}
-		return stl.GenerateSTLRange(allContributions, outputPath, targetUser, startYear, endYear)
+		return stl.GenerateSTLRange(allContributions, outputPath, label, startYear, endYear)
 	}
 
 	return nil

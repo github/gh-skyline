@@ -21,6 +21,7 @@ import (
 var (
 	yearRange string
 	user      string
+	label     string
 	full      bool
 	debug     bool
 	web       bool
@@ -69,6 +70,7 @@ func initFlags() {
 	flags := rootCmd.Flags()
 	flags.StringVarP(&yearRange, "year", "y", fmt.Sprintf("%d", time.Now().Year()), "Year or year range (e.g., 2024 or 2014-2024)")
 	flags.StringVarP(&user, "user", "u", "", "GitHub username (optional, defaults to authenticated user)")
+	flags.StringVarP(&label, "label", "l", "", "Label for the generated model (optional, defaults to username)")
 	flags.BoolVarP(&full, "full", "f", false, "Generate contribution graph from join year to current year")
 	flags.BoolVarP(&debug, "debug", "d", false, "Enable debug logging")
 	flags.BoolVarP(&web, "web", "w", false, "Open GitHub profile (authenticated or specified user).")
@@ -105,7 +107,7 @@ func handleSkylineCommand(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("invalid year range: %v", err)
 	}
 
-	return skyline.GenerateSkyline(startYear, endYear, user, full, output, artOnly)
+	return skyline.GenerateSkyline(startYear, endYear, user, label, full, output, artOnly)
 }
 
 // Browser interface matches browser.Browser functionality.
