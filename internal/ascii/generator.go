@@ -33,10 +33,21 @@ func GenerateASCII(contributionGrid [][]types.ContributionDay, username string, 
 
 	// Find max contribution count for normalization
 	maxContributions := 0
+	var firstDate, lastDate time.Time
 	for _, week := range contributionGrid {
 		for _, day := range week {
 			if day.ContributionCount > maxContributions {
 				maxContributions = day.ContributionCount
+			}
+			// Track first and last dates for YTD display
+			date, err := time.Parse("2006-01-02", day.Date)
+			if err == nil {
+				if firstDate.IsZero() || date.Before(firstDate) {
+					firstDate = date
+				}
+				if lastDate.IsZero() || date.After(lastDate) {
+					lastDate = date
+				}
 			}
 		}
 	}
@@ -81,7 +92,22 @@ func GenerateASCII(contributionGrid [][]types.ContributionDay, username string, 
 		// Add centered user info below
 		buffer.WriteString("\n")
 		buffer.WriteString(centerText(username))
-		buffer.WriteString(centerText(fmt.Sprintf("%d", year)))
+
+		// Check if this is a YTD view (spans exactly 12 months)
+		isYTD := !firstDate.IsZero() && !lastDate.IsZero() &&
+			lastDate.Sub(firstDate) >= 360*24*time.Hour && // approximately 12 months
+			lastDate.Sub(firstDate) <= 370*24*time.Hour // allow for some variation
+
+		if isYTD {
+			// For YTD mode, show date range
+			dateRange := fmt.Sprintf("%s - %s",
+				firstDate.Format("Jan 2, 2006"),
+				lastDate.Format("Jan 2, 2006"))
+			buffer.WriteString(centerText(dateRange))
+		} else {
+			// For regular mode, show year
+			buffer.WriteString(centerText(fmt.Sprintf("%d", year)))
+		}
 	}
 
 	return buffer.String(), nil
