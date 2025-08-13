@@ -1,6 +1,6 @@
 // Package types provides data structures and functions for handling
 // GitHub contribution data and 3D geometry for STL file generation.
-package types
+package types //nolint:revive // package name is appropriate for this internal module
 
 import (
 	"errors"
