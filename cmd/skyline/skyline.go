@@ -135,41 +135,54 @@ func fetchOrgContributionData(client *github.Client, username string, org string
 	}
 
 	dailyCounts := make(map[string]int)
+	collection := response.User.ContributionsCollection
 
-	for _, repo := range response.User.ContributionsCollection.CommitContributionsByRepository {
+	for _, repo := range collection.CommitContributionsByRepository {
 		if strings.EqualFold(repo.Repository.Owner.Login, org) {
 			for _, node := range repo.Contributions.Nodes {
-				date := node.OccurredAt[:10]
-				dailyCounts[date]++
+				addContributionDate(node.OccurredAt, dailyCounts)
 			}
 		}
 	}
-	for _, repo := range response.User.ContributionsCollection.IssueContributionsByRepository {
+
+	for _, repo := range collection.IssueContributionsByRepository {
 		if strings.EqualFold(repo.Repository.Owner.Login, org) {
 			for _, node := range repo.Contributions.Nodes {
-				date := node.OccurredAt[:10]
-				dailyCounts[date]++
+				addContributionDate(node.OccurredAt, dailyCounts)
 			}
 		}
 	}
-	for _, repo := range response.User.ContributionsCollection.PullRequestContributionsByRepository {
+
+	for _, repo := range collection.PullRequestContributionsByRepository {
 		if strings.EqualFold(repo.Repository.Owner.Login, org) {
 			for _, node := range repo.Contributions.Nodes {
-				date := node.OccurredAt[:10]
-				dailyCounts[date]++
+				addContributionDate(node.OccurredAt, dailyCounts)
 			}
 		}
 	}
-	for _, repo := range response.User.ContributionsCollection.PullRequestReviewContributionsByRepository {
+
+	for _, repo := range collection.PullRequestReviewContributionsByRepository {
 		if strings.EqualFold(repo.Repository.Owner.Login, org) {
 			for _, node := range repo.Contributions.Nodes {
-				date := node.OccurredAt[:10]
-				dailyCounts[date]++
+				addContributionDate(node.OccurredAt, dailyCounts)
 			}
 		}
 	}
 
 	return buildContributionGrid(year, dailyCounts), nil
+}
+
+// addContributionDate parses an RFC3339 timestamp and increments the count for that date.
+// Silently skips malformed timestamps to ensure robustness against API changes.
+func addContributionDate(timestamp string, counts map[string]int) {
+	if len(timestamp) < 10 {
+		return
+	}
+	t, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		return
+	}
+	counts[t.Format("2006-01-02")]++
 }
 
 func buildContributionGrid(year int, dailyCounts map[string]int) [][]types.ContributionDay {
@@ -183,27 +196,21 @@ func buildContributionGrid(year int, dailyCounts map[string]int) [][]types.Contr
 	var weeks [][]types.ContributionDay
 	var currentWeek []types.ContributionDay
 
-	for d := startDate; !d.After(endDate) || len(currentWeek) > 0; d = d.AddDate(0, 0, 1) {
+	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
 		dateStr := d.Format("2006-01-02")
-		count := dailyCounts[dateStr]
+		currentWeek = append(currentWeek, types.ContributionDay{
+			Date:              dateStr,
+			ContributionCount: dailyCounts[dateStr],
+		})
 
-		if d.Year() == year || (d.Year() == year-1 && d.After(startDate.AddDate(0, 0, -1))) {
-			currentWeek = append(currentWeek, types.ContributionDay{
-				Date:              dateStr,
-				ContributionCount: count,
-			})
+		if d.Weekday() == time.Saturday {
+			weeks = append(weeks, currentWeek)
+			currentWeek = nil
 		}
+	}
 
-		if d.Weekday() == time.Saturday || d.Equal(endDate) {
-			if len(currentWeek) > 0 {
-				weeks = append(weeks, currentWeek)
-				currentWeek = nil
-			}
-		}
-
-		if d.After(endDate) && d.Weekday() == time.Saturday {
-			break
-		}
+	if len(currentWeek) > 0 {
+		weeks = append(weeks, currentWeek)
 	}
 
 	return weeks

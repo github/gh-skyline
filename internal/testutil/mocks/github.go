@@ -60,7 +60,8 @@ func (m *MockGitHubClient) FetchOrgContributions(username string, _ string, _ in
 	return GenerateOrgContributionsResponse(username, "testorg"), nil
 }
 
-// GenerateOrgContributionsResponse creates mock org contribution data for testing
+// GenerateOrgContributionsResponse creates mock org contribution data for testing.
+// It generates a sample repository with commit contributions for use in unit tests.
 func GenerateOrgContributionsResponse(username, org string) *types.OrgContributionsResponse {
 	resp := &types.OrgContributionsResponse{}
 	resp.User.Login = username
