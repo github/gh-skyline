@@ -21,6 +21,7 @@ import (
 var (
 	yearRange string
 	user      string
+	org       string // filter contributions to specific organization
 	full      bool
 	debug     bool
 	web       bool
@@ -74,6 +75,7 @@ func initFlags() {
 	flags.BoolVarP(&web, "web", "w", false, "Open GitHub profile (authenticated or specified user).")
 	flags.BoolVarP(&artOnly, "art-only", "a", false, "Generate only ASCII preview")
 	flags.StringVarP(&output, "output", "o", "", "Output file path (optional)")
+	flags.StringVar(&org, "org", "", "Filter contributions to a specific organization")
 }
 
 // executeRootCmd is the main execution function for the root command.
@@ -105,7 +107,7 @@ func handleSkylineCommand(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("invalid year range: %v", err)
 	}
 
-	return skyline.GenerateSkyline(startYear, endYear, user, full, output, artOnly)
+	return skyline.GenerateSkyline(startYear, endYear, user, org, full, output, artOnly)
 }
 
 // Browser interface matches browser.Browser functionality.

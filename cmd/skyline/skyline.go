@@ -21,10 +21,11 @@ type GitHubClientInterface interface {
 	GetAuthenticatedUser() (string, error)
 	GetUserJoinYear(username string) (int, error)
 	FetchContributions(username string, year int) (*types.ContributionsResponse, error)
+	FetchOrgContributions(username string, org string, year int) (*types.OrgContributionsResponse, error)
 }
 
 // GenerateSkyline creates a 3D model with ASCII art preview of GitHub contributions for the specified year range, or "full lifetime" of the user
-func GenerateSkyline(startYear, endYear int, targetUser string, full bool, output string, artOnly bool) error {
+func GenerateSkyline(startYear, endYear int, targetUser string, org string, full bool, output string, artOnly bool) error {
 	log := logger.GetLogger()
 
 	client, err := github.InitializeGitHubClient()
@@ -54,7 +55,13 @@ func GenerateSkyline(startYear, endYear int, targetUser string, full bool, outpu
 
 	var allContributions [][][]types.ContributionDay
 	for year := startYear; year <= endYear; year++ {
-		contributions, err := fetchContributionData(client, targetUser, year)
+		var contributions [][]types.ContributionDay
+		var err error
+		if org != "" {
+			contributions, err = fetchOrgContributionData(client, targetUser, org, year)
+		} else {
+			contributions, err = fetchContributionData(client, targetUser, year)
+		}
 		if err != nil {
 			return err
 		}
@@ -111,7 +118,6 @@ func fetchContributionData(client *github.Client, username string, year int) ([]
 		return nil, fmt.Errorf("failed to fetch contributions: %w", err)
 	}
 
-	// Convert weeks data to 2D array for STL generation
 	weeks := response.User.ContributionsCollection.ContributionCalendar.Weeks
 	contributionGrid := make([][]types.ContributionDay, len(weeks))
 	for i, week := range weeks {
@@ -119,4 +125,93 @@ func fetchContributionData(client *github.Client, username string, year int) ([]
 	}
 
 	return contributionGrid, nil
+}
+
+// fetchOrgContributionData retrieves contributions filtered to a specific organization.
+func fetchOrgContributionData(client *github.Client, username string, org string, year int) ([][]types.ContributionDay, error) {
+	response, err := client.FetchOrgContributions(username, org, year)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch org contributions: %w", err)
+	}
+
+	dailyCounts := make(map[string]int)
+	collection := response.User.ContributionsCollection
+
+	for _, repo := range collection.CommitContributionsByRepository {
+		if strings.EqualFold(repo.Repository.Owner.Login, org) {
+			for _, node := range repo.Contributions.Nodes {
+				addContributionDate(node.OccurredAt, dailyCounts)
+			}
+		}
+	}
+
+	for _, repo := range collection.IssueContributionsByRepository {
+		if strings.EqualFold(repo.Repository.Owner.Login, org) {
+			for _, node := range repo.Contributions.Nodes {
+				addContributionDate(node.OccurredAt, dailyCounts)
+			}
+		}
+	}
+
+	for _, repo := range collection.PullRequestContributionsByRepository {
+		if strings.EqualFold(repo.Repository.Owner.Login, org) {
+			for _, node := range repo.Contributions.Nodes {
+				addContributionDate(node.OccurredAt, dailyCounts)
+			}
+		}
+	}
+
+	for _, repo := range collection.PullRequestReviewContributionsByRepository {
+		if strings.EqualFold(repo.Repository.Owner.Login, org) {
+			for _, node := range repo.Contributions.Nodes {
+				addContributionDate(node.OccurredAt, dailyCounts)
+			}
+		}
+	}
+
+	return buildContributionGrid(year, dailyCounts), nil
+}
+
+// addContributionDate parses an RFC3339 timestamp and increments the count for that date.
+// Silently skips malformed timestamps to ensure robustness against API changes.
+func addContributionDate(timestamp string, counts map[string]int) {
+	if len(timestamp) < 10 {
+		return
+	}
+	t, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		return
+	}
+	counts[t.Format("2006-01-02")]++
+}
+
+func buildContributionGrid(year int, dailyCounts map[string]int) [][]types.ContributionDay {
+	startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC)
+
+	for startDate.Weekday() != time.Sunday {
+		startDate = startDate.AddDate(0, 0, -1)
+	}
+
+	var weeks [][]types.ContributionDay
+	var currentWeek []types.ContributionDay
+
+	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+		dateStr := d.Format("2006-01-02")
+		currentWeek = append(currentWeek, types.ContributionDay{
+			Date:              dateStr,
+			ContributionCount: dailyCounts[dateStr],
+		})
+
+		if d.Weekday() == time.Saturday {
+			weeks = append(weeks, currentWeek)
+			currentWeek = nil
+		}
+	}
+
+	if len(currentWeek) > 0 {
+		weeks = append(weeks, currentWeek)
+	}
+
+	return weeks
 }
