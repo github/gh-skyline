@@ -181,14 +181,9 @@ func createVoxelOnFace(px float64, py float64, height float64, baseWidth float64
 
 	if baseType == "slanted" {
 		slantFactor := y / baseHeight
-		// The horizontal width increases from baseWidth at top (y=0) to baseWidth + 2*BaseSlant at bottom (y=baseHeight)
-		faceWidthAtZ := baseWidth + 2*BaseSlant*slantFactor
-		// Position X proportionally within the wider face
-		finalX = (x/baseWidth)*faceWidthAtZ - BaseSlant*slantFactor
-		// Shift Y outwards to match the slanted base face
+		// Shift Y outwards to match the slanted base face.
+		// We avoid scaling X or shifting finalX to keep the font vertically consistent.
 		finalY = -height - BaseSlant*slantFactor
-		// Scale voxel width slightly
-		finalWidth = (voxelSizeX / baseWidth) * faceWidthAtZ
 	}
 
 	cube, err := CreateCube(
