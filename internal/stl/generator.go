@@ -12,10 +12,10 @@ import (
 
 // GenerateSTL creates a 3D model from GitHub contribution data and writes it to an STL file.
 // It's a convenience wrapper around GenerateSTLRange for single year processing.
-func GenerateSTL(contributions [][]types.ContributionDay, outputPath, username string, year int) error {
+func GenerateSTL(contributions [][]types.ContributionDay, outputPath, username string, year int, baseType string) error {
 	// Wrap single year data in the format expected by GenerateSTLRange
 	contributionsRange := [][][]types.ContributionDay{contributions}
-	return GenerateSTLRange(contributionsRange, outputPath, username, year, year)
+	return GenerateSTLRange(contributionsRange, outputPath, username, year, year, baseType)
 }
 
 // GenerateSTLRange creates a 3D model from multiple years of GitHub contribution data.
@@ -26,7 +26,8 @@ func GenerateSTL(contributions [][]types.ContributionDay, outputPath, username s
 //   - username: GitHub username for the contribution data
 //   - startYear: first year in the range
 //   - endYear: last year in the range
-func GenerateSTLRange(contributions [][][]types.ContributionDay, outputPath, username string, startYear, endYear int) error {
+//   - baseType: type of the model base (flat or slanted)
+func GenerateSTLRange(contributions [][][]types.ContributionDay, outputPath, username string, startYear, endYear int, baseType string) error {
 	log := logger.GetLogger()
 	if err := log.Debug("Starting STL generation for user %s, years %d-%d", username, startYear, endYear); err != nil {
 		return errors.Wrap(err, "failed to log debug message")
@@ -44,7 +45,7 @@ func GenerateSTLRange(contributions [][][]types.ContributionDay, outputPath, use
 	// Find global max contribution across all years
 	maxContribution := findMaxContributionsAcrossYears(contributions)
 
-	modelTriangles, err := generateModelGeometry(contributions, dimensions, maxContribution, username, startYear, endYear)
+	modelTriangles, err := generateModelGeometry(contributions, dimensions, maxContribution, username, startYear, endYear, baseType)
 	if err != nil {
 		return errors.Wrap(err, "failed to generate geometry")
 	}
@@ -144,7 +145,7 @@ type geometryResult struct {
 
 // generateModelGeometry orchestrates the concurrent generation of all model components.
 // It manages four parallel processes for generating the base, columns, text, and logo.
-func generateModelGeometry(contributionsPerYear [][][]types.ContributionDay, dims modelDimensions, maxContrib int, username string, startYear, endYear int) ([]types.Triangle, error) {
+func generateModelGeometry(contributionsPerYear [][][]types.ContributionDay, dims modelDimensions, maxContrib int, username string, startYear, endYear int, baseType string) ([]types.Triangle, error) {
 	if len(contributionsPerYear) == 0 {
 		return nil, errors.New(errors.ValidationError, "contributions data cannot be empty", nil)
 	}
@@ -161,10 +162,10 @@ func generateModelGeometry(contributionsPerYear [][][]types.ContributionDay, dim
 	wg.Add(len(channels))
 
 	// Launch goroutines for each component
-	go generateBase(dims, channels["base"], &wg)
+	go generateBase(dims, baseType, channels["base"], &wg)
 	go generateColumnsForYearRange(contributionsPerYear, maxContrib, channels["columns"], &wg)
-	go generateText(username, startYear, endYear, dims, channels["text"], &wg)
-	go generateLogo(dims, channels["image"], &wg)
+	go generateText(username, startYear, endYear, dims, baseType, channels["text"], &wg)
+	go generateLogo(dims, baseType, channels["image"], &wg)
 
 	// Collect results from all channels
 	modelTriangles := make([]types.Triangle, 0, estimateTriangleCount(contributionsPerYear[0])*len(contributionsPerYear))
@@ -185,9 +186,17 @@ func generateModelGeometry(contributionsPerYear [][][]types.ContributionDay, dim
 	return modelTriangles, nil
 }
 
-func generateBase(dims modelDimensions, ch chan<- geometryResult, wg *sync.WaitGroup) {
+func generateBase(dims modelDimensions, baseType string, ch chan<- geometryResult, wg *sync.WaitGroup) {
 	defer wg.Done()
-	baseTriangles, err := geometry.CreateCuboidBase(dims.innerWidth, dims.innerDepth)
+	
+	var baseTriangles []types.Triangle
+	var err error
+	
+	if baseType == "slanted" {
+		baseTriangles, err = geometry.CreateSlantedBase(dims.innerWidth, dims.innerDepth)
+	} else {
+		baseTriangles, err = geometry.CreateCuboidBase(dims.innerWidth, dims.innerDepth)
+	}
 
 	if err != nil {
 		if logErr := logger.GetLogger().Warning("Failed to generate base geometry: %v. Continuing without base.", err); logErr != nil {
@@ -202,7 +211,7 @@ func generateBase(dims modelDimensions, ch chan<- geometryResult, wg *sync.WaitG
 }
 
 // generateText creates 3D text geometry for the model
-func generateText(username string, startYear int, endYear int, dims modelDimensions, ch chan<- geometryResult, wg *sync.WaitGroup) {
+func generateText(username string, startYear int, endYear int, dims modelDimensions, baseType string, ch chan<- geometryResult, wg *sync.WaitGroup) {
 	defer wg.Done()
 	embossedYear := fmt.Sprintf("%d", endYear)
 
@@ -212,7 +221,7 @@ func generateText(username string, startYear int, endYear int, dims modelDimensi
 		embossedYear = fmt.Sprintf("%04d-%02d", startYear, endYear%100)
 	}
 
-	textTriangles, err := geometry.Create3DText(username, embossedYear, dims.innerWidth, geometry.BaseHeight)
+	textTriangles, err := geometry.Create3DText(username, embossedYear, dims.innerWidth, geometry.BaseHeight, baseType)
 	if err != nil {
 		if logErr := logger.GetLogger().Warning("Failed to generate text geometry: %v. Continuing without text.", err); logErr != nil {
 			ch <- geometryResult{triangles: []types.Triangle{}, err: logErr}
@@ -225,9 +234,9 @@ func generateText(username string, startYear int, endYear int, dims modelDimensi
 }
 
 // generateLogo handles the generation of the GitHub logo geometry
-func generateLogo(dims modelDimensions, ch chan<- geometryResult, wg *sync.WaitGroup) {
+func generateLogo(dims modelDimensions, baseType string, ch chan<- geometryResult, wg *sync.WaitGroup) {
 	defer wg.Done()
-	logoTriangles, err := geometry.GenerateImageGeometry(dims.innerWidth, geometry.BaseHeight)
+	logoTriangles, err := geometry.GenerateImageGeometry(dims.innerWidth, geometry.BaseHeight, baseType)
 	if err != nil {
 		// Log warning and continue without logo instead of failing
 		if logErr := logger.GetLogger().Warning("Failed to generate logo geometry: %v. Continuing without logo.", err); logErr != nil {
