@@ -24,7 +24,7 @@ type GitHubClientInterface interface {
 }
 
 // GenerateSkyline creates a 3D model with ASCII art preview of GitHub contributions for the specified year range, or "full lifetime" of the user
-func GenerateSkyline(startYear, endYear int, targetUser string, full bool, output string, artOnly bool) error {
+func GenerateSkyline(startYear, endYear int, targetUser string, full bool, output string, artOnly bool, baseType string) error {
 	log := logger.GetLogger()
 
 	client, err := github.InitializeGitHubClient()
@@ -96,9 +96,9 @@ func GenerateSkyline(startYear, endYear int, targetUser string, full bool, outpu
 
 		// Generate the STL file
 		if len(allContributions) == 1 {
-			return stl.GenerateSTL(allContributions[0], outputPath, targetUser, startYear)
+			return stl.GenerateSTL(allContributions[0], outputPath, targetUser, startYear, baseType)
 		}
-		return stl.GenerateSTLRange(allContributions, outputPath, targetUser, startYear, endYear)
+		return stl.GenerateSTLRange(allContributions, outputPath, targetUser, startYear, endYear, baseType)
 	}
 
 	return nil

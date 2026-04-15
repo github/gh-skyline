@@ -27,7 +27,7 @@ func TestGenerateSTL(t *testing.T) {
 	tempDir := t.TempDir()
 	outputPath := filepath.Join(tempDir, "test.stl")
 
-	err := GenerateSTL(contributions, outputPath, "testuser", 2023)
+	err := GenerateSTL(contributions, outputPath, "testuser", 2023, "flat")
 	if err != nil {
 		// Check if error is due to missing resources
 		if strings.Contains(err.Error(), "failed to open image") ||
@@ -58,7 +58,7 @@ func TestGenerateSTL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := GenerateSTL(tt.contributions, tt.outputPath, tt.username, tt.year)
+			err := GenerateSTL(tt.contributions, tt.outputPath, tt.username, tt.year, "flat")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GenerateSTL() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -168,7 +168,7 @@ func TestGenerateSTLRange(t *testing.T) {
 				}
 			}()
 
-			err := GenerateSTLRange(tt.contributions, tt.outputPath, tt.username, tt.startYear, tt.endYear)
+			err := GenerateSTLRange(tt.contributions, tt.outputPath, tt.username, tt.startYear, tt.endYear, "flat")
 			if (err != nil) != tt.wantErr {
 				// Only fail if the error is not related to missing resources
 				if !strings.Contains(err.Error(), "failed to open image") {
@@ -327,7 +327,7 @@ func TestGenerateBase(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	go generateBase(dims, ch, &wg)
+	go generateBase(dims, "flat", ch, &wg)
 
 	result := <-ch
 	if result.err != nil {
@@ -347,7 +347,7 @@ func TestGenerateText(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	go generateText("testuser", 2023, 2023, dims, ch, &wg)
+	go generateText("testuser", 2023, 2023, dims, "flat", ch, &wg)
 
 	result := <-ch
 	if result.err != nil {
@@ -429,7 +429,7 @@ func TestGenerateModelGeometry(t *testing.T) {
 	startYear := 2022
 	endYear := 2023
 
-	triangles, err := generateModelGeometry(contributionsPerYear, dims, maxContrib, username, startYear, endYear)
+	triangles, err := generateModelGeometry(contributionsPerYear, dims, maxContrib, username, startYear, endYear, "flat")
 	if err != nil {
 		t.Errorf("generateModelGeometry() error = %v", err)
 	}
@@ -438,13 +438,13 @@ func TestGenerateModelGeometry(t *testing.T) {
 	}
 
 	// Test error case with nil contributions
-	_, err = generateModelGeometry(nil, dims, maxContrib, username, startYear, endYear)
+	_, err = generateModelGeometry(nil, dims, maxContrib, username, startYear, endYear, "flat")
 	if err == nil {
 		t.Error("generateModelGeometry() should return error for nil contributions")
 	}
 
 	// Test with empty username
-	_, err = generateModelGeometry(contributionsPerYear, dims, maxContrib, "", startYear, endYear)
+	_, err = generateModelGeometry(contributionsPerYear, dims, maxContrib, "", startYear, endYear, "flat")
 	if err != nil {
 		t.Error("generateModelGeometry() should handle empty username")
 	}
@@ -459,7 +459,7 @@ func TestGenerateLogo(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	go generateLogo(dims, ch, &wg)
+	go generateLogo(dims, "flat", ch, &wg)
 
 	result := <-ch
 	// Even if image file is not found, result should not be nil
@@ -521,7 +521,7 @@ func TestGenerateText_WithYearRange(t *testing.T) {
 			var wg sync.WaitGroup
 			wg.Add(1)
 
-			go generateText(tt.username, tt.startYear, tt.endYear, dims, ch, &wg)
+			go generateText(tt.username, tt.startYear, tt.endYear, dims, "flat", ch, &wg)
 
 			result := <-ch
 			// Even if font generation fails, result should not be nil
@@ -584,7 +584,7 @@ func TestResourceHandling(t *testing.T) {
 		wg.Add(1)
 
 		// This should log a warning but continue
-		go generateText("testuser", 2023, 2023, dims, ch, &wg)
+		go generateText("testuser", 2023, 2023, dims, "flat", ch, &wg)
 
 		result := <-ch
 		// Even with missing fonts, we should get a valid (possibly empty) result
@@ -605,7 +605,7 @@ func TestResourceHandling(t *testing.T) {
 		wg.Add(1)
 
 		// This should log a warning but continue
-		go generateLogo(dims, ch, &wg)
+		go generateLogo(dims, "flat", ch, &wg)
 
 		result := <-ch
 		// Even with missing image, we should get a valid (possibly empty) result
@@ -629,7 +629,7 @@ func TestResourceHandling(t *testing.T) {
 		maxContrib := findMaxContributionsAcrossYears(contributionsPerYear)
 
 		// This should complete successfully even with missing resources
-		triangles, err := generateModelGeometry(contributionsPerYear, dims, maxContrib, "testuser", 2022, 2023)
+		triangles, err := generateModelGeometry(contributionsPerYear, dims, maxContrib, "testuser", 2022, 2023, "flat")
 		if err != nil {
 			t.Errorf("generateModelGeometry() failed with missing resources: %v", err)
 		}

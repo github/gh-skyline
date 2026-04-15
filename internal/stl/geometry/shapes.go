@@ -26,6 +26,14 @@ func CreateCuboidBase(width, depth float64) ([]types.Triangle, error) {
 	return createBox(0, 0, -BaseHeight, width, depth, BaseHeight)
 }
 
+// CreateSlantedBase generates triangles for a rectangular base with a slanted bottom.
+func CreateSlantedBase(width, depth float64) ([]types.Triangle, error) {
+	// The base starts at Z = -BaseHeight and extends to Z = 0
+	// We offset the bottom vertices outward by a slant amount to create an angled base.
+	// Based on original implementations, a 22.5-degree slant angle is standard.
+	return createSlantedBox(0, 0, -BaseHeight, width, depth, BaseHeight, BaseSlant)
+}
+
 // CreateColumn generates triangles for a vertical column at the specified position.
 // The column extends from the base height to the specified height.
 func CreateColumn(x, y, height, size float64) ([]types.Triangle, error) {
@@ -107,3 +115,56 @@ func createBox(x, y, z, width, height, depth float64) ([]types.Triangle, error) 
 
 	return triangles, nil
 }
+
+// createSlantedBox generates triangles for a box shape where the bottom vertices are expanded outwards by the 'slant' offset.
+// This creates a base that is wider at the bottom than at the top.
+func createSlantedBox(x, y, z, width, height, depth, slant float64) ([]types.Triangle, error) {
+	if width < 0 || height < 0 || depth < 0 {
+		return nil, errors.New(errors.ValidationError, "negative dimensions not allowed", nil)
+	}
+
+	const facesCount = 6
+	const trianglesPerFace = 2
+	triangles := make([]types.Triangle, 0, facesCount*trianglesPerFace)
+
+	vertices := make([]types.Point3D, 8)
+	quads := [6][4]int{
+		{0, 3, 2, 1}, // bottom
+		{5, 6, 7, 4}, // top
+		{4, 7, 3, 0}, // left
+		{1, 2, 6, 5}, // right
+		{3, 7, 6, 2}, // back
+		{4, 0, 1, 5}, // front
+	}
+
+	// Wait, is 'height' Y, and 'depth' Z like createBox? Yes.
+	// vertices[0..3] are at Z=z. We expand them by slant.
+	vertices[0] = types.Point3D{X: x - slant, Y: y - slant, Z: z}
+	vertices[1] = types.Point3D{X: x + width + slant, Y: y - slant, Z: z}
+	vertices[2] = types.Point3D{X: x + width + slant, Y: y + height + slant, Z: z}
+	vertices[3] = types.Point3D{X: x - slant, Y: y + height + slant, Z: z}
+
+	// vertices[4..7] are at Z=z+depth. Keep them regular size.
+	vertices[4] = types.Point3D{X: x, Y: y, Z: z + depth}
+	vertices[5] = types.Point3D{X: x + width, Y: y, Z: z + depth}
+	vertices[6] = types.Point3D{X: x + width, Y: y + height, Z: z + depth}
+	vertices[7] = types.Point3D{X: x, Y: y + height, Z: z + depth}
+
+	for _, quad := range quads {
+		quadTriangles, err := CreateQuad(
+			vertices[quad[0]],
+			vertices[quad[1]],
+			vertices[quad[2]],
+			vertices[quad[3]],
+		)
+
+		if err != nil {
+			return nil, errors.New(errors.STLError, "failed to create quad", err)
+		}
+
+		triangles = append(triangles, quadTriangles...)
+	}
+
+	return triangles, nil
+}
+

@@ -15,7 +15,7 @@ import (
 func TestCreate3DText(t *testing.T) {
 
 	t.Run("verify basic text mesh generation", func(t *testing.T) {
-		triangles, err := Create3DText("test", "2023", 100.0, 5.0)
+		triangles, err := Create3DText("test", "2023", 100.0, 5.0, "flat")
 		if err != nil {
 			t.Fatalf("Create3DText failed: %v", err)
 		}
@@ -25,7 +25,7 @@ func TestCreate3DText(t *testing.T) {
 	})
 
 	t.Run("verify text generation with empty username", func(t *testing.T) {
-		triangles, err := Create3DText("", "2023", 100.0, 5.0)
+		triangles, err := Create3DText("", "2023", 100.0, 5.0, "flat")
 		if err != nil {
 			t.Fatalf("Create3DText failed with empty username: %v", err)
 		}
@@ -35,7 +35,7 @@ func TestCreate3DText(t *testing.T) {
 	})
 
 	t.Run("verify normal vectors of text geometry", func(t *testing.T) {
-		triangles, err := Create3DText("test", "2023", 100.0, 5.0)
+		triangles, err := Create3DText("test", "2023", 100.0, 5.0, "flat")
 		if err != nil {
 			t.Fatalf("Create3DText failed: %v", err)
 		}
@@ -67,6 +67,7 @@ func TestRenderText(t *testing.T) {
 			10.0,   // fontSize
 			200.0,  // baseWidth
 			10.0,   // baseHeight
+			"flat", // baseType
 		)
 
 		if err != nil {
@@ -89,6 +90,7 @@ func TestRenderImage(t *testing.T) {
 			0.1,               // topOffsetPercent
 			200.0,             // baseWidth
 			10.0,              // baseHeight
+			"flat",            // baseType
 		)
 		if err == nil {
 			t.Error("Expected error for invalid image path")
@@ -153,7 +155,7 @@ func TestGenerateImageGeometry(t *testing.T) {
 	}()
 
 	t.Run("verify valid image geometry generation", func(t *testing.T) {
-		triangles, err := GenerateImageGeometry(100.0, 5.0)
+		triangles, err := GenerateImageGeometry(100.0, 5.0, "flat")
 		if err != nil {
 			t.Fatalf("GenerateImageGeometry failed: %v", err)
 		}
@@ -163,7 +165,7 @@ func TestGenerateImageGeometry(t *testing.T) {
 	})
 
 	t.Run("verify geometry normal vectors", func(t *testing.T) {
-		triangles, err := GenerateImageGeometry(100.0, 5.0)
+		triangles, err := GenerateImageGeometry(100.0, 5.0, "flat")
 		if err != nil {
 			t.Fatalf("GenerateImageGeometry failed: %v", err)
 		}

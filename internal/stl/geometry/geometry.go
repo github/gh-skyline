@@ -14,6 +14,7 @@ const (
 	GridSize      int     = 53       // Number of weeks in a year
 	BaseThickness float64 = 10.0     // Total thickness of the base
 	MinHeight     float64 = CellSize // Minimum height for any contribution column
+	BaseSlant     float64 = 3.64     // Slant offset for the base (BaseHeight * tan(20°))
 )
 
 // Text rendering constants control the appearance and positioning of text.

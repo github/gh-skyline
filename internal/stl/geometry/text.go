@@ -28,7 +28,7 @@ const (
 )
 
 // Create3DText generates 3D text geometry for the username and year.
-func Create3DText(username string, year string, baseWidth float64, baseHeight float64) ([]types.Triangle, error) {
+func Create3DText(username string, year string, baseWidth float64, baseHeight float64, baseType string) ([]types.Triangle, error) {
 	if username == "" {
 		username = "anonymous"
 	}
@@ -40,6 +40,7 @@ func Create3DText(username string, year string, baseWidth float64, baseHeight fl
 		usernameFontSize,
 		baseWidth,
 		baseHeight,
+		baseType,
 	)
 	if err != nil {
 		return nil, err
@@ -52,6 +53,7 @@ func Create3DText(username string, year string, baseWidth float64, baseHeight fl
 		yearFontSize,
 		baseWidth,
 		baseHeight,
+		baseType,
 	)
 	if err != nil {
 		return nil, err
@@ -73,7 +75,7 @@ func Create3DText(username string, year string, baseWidth float64, baseHeight fl
 // Returns:
 //
 //	([]types.Triangle, error): A slice of triangles representing text.
-func renderText(text string, justification string, leftOffsetPercent float64, fontSize float64, baseWidth float64, baseHeight float64) ([]types.Triangle, error) {
+func renderText(text string, justification string, leftOffsetPercent float64, fontSize float64, baseWidth float64, baseHeight float64, baseType string) ([]types.Triangle, error) {
 	// Create a rendering context for the face of the skyline
 	faceWidthRes := baseWidthVoxelResolution
 	faceHeightRes := int(float64(faceWidthRes) * baseHeight / baseWidth)
@@ -129,6 +131,7 @@ func renderText(text string, justification string, leftOffsetPercent float64, fo
 					voxelDepth,
 					baseWidth,
 					baseHeight,
+					baseType,
 				)
 				if err != nil {
 					return nil, errors.New(errors.STLError, "failed to create cube", err)
@@ -157,7 +160,7 @@ func renderText(text string, justification string, leftOffsetPercent float64, fo
 // Returns:
 //
 //	([]types.Triangle, error): A slice of triangles representing the cube and an error if any.
-func createVoxelOnFace(x float64, y float64, height float64, baseWidth float64, baseHeight float64) ([]types.Triangle, error) {
+func createVoxelOnFace(px float64, py float64, height float64, baseWidth float64, baseHeight float64, baseType string) ([]types.Triangle, error) {
 	// Mapping resolution
 	xResolution := float64(baseWidthVoxelResolution)
 	yResolution := xResolution * baseHeight / baseWidth
@@ -166,19 +169,31 @@ func createVoxelOnFace(x float64, y float64, height float64, baseWidth float64, 
 	voxelSize := 1.0
 
 	// Scale coordinate to face resolution
-	x = (x / xResolution) * baseWidth
-	y = (y / yResolution) * baseHeight
+	x := (px / xResolution) * baseWidth
+	y := (py / yResolution) * baseHeight
 	voxelSizeX := (voxelSize / xResolution) * baseWidth
 	voxelSizeY := (voxelSize / yResolution) * baseHeight
 
+	// Slant adjustment
+	finalX := x
+	finalY := -height
+	finalWidth := voxelSizeX
+
+	if baseType == "slanted" {
+		slantFactor := y / baseHeight
+		// Shift Y outwards to match the slanted base face.
+		// We avoid scaling X or shifting finalX to keep the font vertically consistent.
+		finalY = -height - BaseSlant*slantFactor
+	}
+
 	cube, err := CreateCube(
 		// Location (from top left corner of skyline face)
-		x,             // x - Left to right
-		-height,       // y - Negative comes out of face. Positive goes into face.
+		finalX,        // x - Left to right
+		finalY,        // y - Depth
 		-voxelSizeY-y, // z - Bottom to top
 
 		// Size
-		voxelSizeX, // x length - left to right from specified point
+		finalWidth, // x length - left to right from specified point
 		height,     // thickness - distance coming out of face
 		voxelSizeY, // y length - bottom to top from specified point
 	)
@@ -187,7 +202,7 @@ func createVoxelOnFace(x float64, y float64, height float64, baseWidth float64, 
 }
 
 // GenerateImageGeometry creates 3D geometry from the embedded logo image.
-func GenerateImageGeometry(baseWidth float64, baseHeight float64) ([]types.Triangle, error) {
+func GenerateImageGeometry(baseWidth float64, baseHeight float64, baseType string) ([]types.Triangle, error) {
 	// Get temporary image file
 	imgPath, cleanup, err := getEmbeddedImage()
 	if err != nil {
@@ -204,11 +219,12 @@ func GenerateImageGeometry(baseWidth float64, baseHeight float64) ([]types.Trian
 		logoTopOffset,
 		baseWidth,
 		baseHeight,
+		baseType,
 	)
 }
 
 // renderImage generates 3D geometry for the given image configuration.
-func renderImage(filePath string, scale float64, height float64, leftOffsetPercent float64, topOffsetPercent float64, baseWidth float64, baseHeight float64) ([]types.Triangle, error) {
+func renderImage(filePath string, scale float64, height float64, leftOffsetPercent float64, topOffsetPercent float64, baseWidth float64, baseHeight float64, baseType string) ([]types.Triangle, error) {
 
 	// Get voxel resolution of base face
 	faceWidthRes := baseWidthVoxelResolution
@@ -252,6 +268,7 @@ func renderImage(filePath string, scale float64, height float64, leftOffsetPerce
 					height,
 					baseWidth,
 					baseHeight,
+					baseType,
 				)
 
 				if err != nil {
