@@ -103,6 +103,75 @@ func TestGetUserJoinYear(t *testing.T) {
 	}
 }
 
+func TestFetchOrgContributions(t *testing.T) {
+	tests := []struct {
+		name          string
+		username      string
+		org           string
+		year          int
+		mockError     error
+		expectedError bool
+	}{
+		{
+			name:          "successful response",
+			username:      "testuser",
+			org:           "testorg",
+			year:          2024,
+			expectedError: false,
+		},
+		{
+			name:          "empty username",
+			username:      "",
+			org:           "testorg",
+			year:          2024,
+			expectedError: true,
+		},
+		{
+			name:          "empty org",
+			username:      "testuser",
+			org:           "",
+			year:          2024,
+			expectedError: true,
+		},
+		{
+			name:          "invalid year",
+			username:      "testuser",
+			org:           "testorg",
+			year:          2007,
+			expectedError: true,
+		},
+		{
+			name:          "network error",
+			username:      "testuser",
+			org:           "testorg",
+			year:          2024,
+			mockError:     errors.New(errors.NetworkError, "network error", nil),
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := NewClient(&mocks.MockGitHubClient{
+				Username: tt.username,
+				Err:      tt.mockError,
+			})
+
+			resp, err := client.FetchOrgContributions(tt.username, tt.org, tt.year)
+			if (err != nil) != tt.expectedError {
+				t.Errorf("expected error: %v, got: %v", tt.expectedError, err)
+			}
+			if !tt.expectedError {
+				if resp == nil {
+					t.Error("expected response but got nil")
+				} else if resp.User.Login != tt.username {
+					t.Errorf("expected user %s, got %s", tt.username, resp.User.Login)
+				}
+			}
+		})
+	}
+}
+
 func TestFetchContributions(t *testing.T) {
 	mockContributions := &types.ContributionsResponse{
 		User: struct {
