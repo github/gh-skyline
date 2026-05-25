@@ -51,6 +51,65 @@ type ContributionsResponse struct {
 	} `json:"user"`
 }
 
+// OrgContributionsResponse represents contribution data grouped by repository for org filtering.
+type OrgContributionsResponse struct {
+	User struct {
+		Login                   string `json:"login"`
+		ContributionsCollection struct {
+			CommitContributionsByRepository []struct {
+				Repository struct {
+					Name  string `json:"name"`
+					Owner struct {
+						Login string `json:"login"`
+					} `json:"owner"`
+				} `json:"repository"`
+				Contributions struct {
+					TotalCount int `json:"totalCount"`
+					Nodes      []struct {
+						OccurredAt string `json:"occurredAt"`
+					} `json:"nodes"`
+				} `json:"contributions"`
+			} `json:"commitContributionsByRepository"`
+			IssueContributionsByRepository []struct {
+				Repository struct {
+					Owner struct {
+						Login string `json:"login"`
+					} `json:"owner"`
+				} `json:"repository"`
+				Contributions struct {
+					Nodes []struct {
+						OccurredAt string `json:"occurredAt"`
+					} `json:"nodes"`
+				} `json:"contributions"`
+			} `json:"issueContributionsByRepository"`
+			PullRequestContributionsByRepository []struct {
+				Repository struct {
+					Owner struct {
+						Login string `json:"login"`
+					} `json:"owner"`
+				} `json:"repository"`
+				Contributions struct {
+					Nodes []struct {
+						OccurredAt string `json:"occurredAt"`
+					} `json:"nodes"`
+				} `json:"contributions"`
+			} `json:"pullRequestContributionsByRepository"`
+			PullRequestReviewContributionsByRepository []struct {
+				Repository struct {
+					Owner struct {
+						Login string `json:"login"`
+					} `json:"owner"`
+				} `json:"repository"`
+				Contributions struct {
+					Nodes []struct {
+						OccurredAt string `json:"occurredAt"`
+					} `json:"nodes"`
+				} `json:"contributions"`
+			} `json:"pullRequestReviewContributionsByRepository"`
+		} `json:"contributionsCollection"`
+	} `json:"user"`
+}
+
 // Point3D represents a point in 3D space using float64 for accuracy in calculations.
 // Each coordinate (X, Y, Z) represents a position in 3D space.
 type Point3D struct {
