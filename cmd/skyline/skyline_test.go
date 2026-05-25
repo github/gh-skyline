@@ -20,6 +20,7 @@ func TestGenerateSkyline(t *testing.T) {
 		startYear  int
 		endYear    int
 		targetUser string
+		label      string
 		full       bool
 		mockClient *mocks.MockGitHubClient
 		wantErr    bool
@@ -29,6 +30,7 @@ func TestGenerateSkyline(t *testing.T) {
 			startYear:  2024,
 			endYear:    2024,
 			targetUser: "testuser",
+			label:      "",
 			full:       false,
 			mockClient: &mocks.MockGitHubClient{
 				Username: "testuser",
@@ -42,6 +44,7 @@ func TestGenerateSkyline(t *testing.T) {
 			startYear:  2020,
 			endYear:    2024,
 			targetUser: "testuser",
+			label:      "",
 			full:       false,
 			mockClient: &mocks.MockGitHubClient{
 				Username: "testuser",
@@ -55,6 +58,7 @@ func TestGenerateSkyline(t *testing.T) {
 			startYear:  2008,
 			endYear:    2024,
 			targetUser: "testuser",
+			label:      "",
 			full:       true,
 			mockClient: &mocks.MockGitHubClient{
 				Username: "testuser",
@@ -72,7 +76,7 @@ func TestGenerateSkyline(t *testing.T) {
 				return github.NewClient(tt.mockClient), nil
 			}
 
-			err := GenerateSkyline(tt.startYear, tt.endYear, tt.targetUser, tt.full, "", false)
+			err := GenerateSkyline(tt.startYear, tt.endYear, tt.targetUser, tt.label, tt.full, "", false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GenerateSkyline() error = %v, wantErr %v", err, tt.wantErr)
 			}
