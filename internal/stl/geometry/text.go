@@ -18,13 +18,29 @@ const (
 	logoTopOffset  = 0.15 // Percent
 	logoLeftOffset = 0.03 // Percent
 
-	usernameFontSize      = 120.0
-	usernameJustification = "left" // "left", "center", "right"
-	usernameLeftOffset    = 0.1    // Percent
+	textEdgeOffsetPercent = 0.03
+)
 
-	yearFontSize      = 100.0
-	yearJustification = "right" // "left", "center", "right"
-	yearLeftOffset    = 0.97    // Percent
+// textRenderConfig controls how text is sized and positioned horizontally.
+// edgeOffsetPercent is measured from the edge implied by justification: left
+// text is offset from the left edge and right text from the right edge.
+type textRenderConfig struct {
+	fontSize          float64
+	justification     string
+	edgeOffsetPercent float64
+}
+
+var (
+	usernameTextConfig = textRenderConfig{
+		fontSize:          120.0,
+		justification:     "left",
+		edgeOffsetPercent: textEdgeOffsetPercent,
+	}
+	yearTextConfig = textRenderConfig{
+		fontSize:          100.0,
+		justification:     "right",
+		edgeOffsetPercent: textEdgeOffsetPercent,
+	}
 )
 
 // Create3DText generates 3D text geometry for the username and year.
@@ -35,9 +51,7 @@ func Create3DText(username string, year string, baseWidth float64, baseHeight fl
 
 	usernameTriangles, err := renderText(
 		username,
-		usernameJustification,
-		usernameLeftOffset,
-		usernameFontSize,
+		usernameTextConfig,
 		baseWidth,
 		baseHeight,
 	)
@@ -47,9 +61,7 @@ func Create3DText(username string, year string, baseWidth float64, baseHeight fl
 
 	yearTriangles, err := renderText(
 		year,
-		yearJustification,
-		yearLeftOffset,
-		yearFontSize,
+		yearTextConfig,
 		baseWidth,
 		baseHeight,
 	)
@@ -60,20 +72,19 @@ func Create3DText(username string, year string, baseWidth float64, baseHeight fl
 	return append(usernameTriangles, yearTriangles...), nil
 }
 
-// renderText places text on the face of a skyline, offset from the left and vertically-aligned.
-// The function takes the text to be displayed, offset from left, and font size.
+// renderText places text on the face of a skyline, offset from its nearest edge and vertically-aligned.
+// The function takes the text to be displayed and its rendering configuration.
 // It returns an array of types.Triangle.
 //
 // Parameters:
 //
 //	text (string): The text to be displayed on the skyline's front face.
-//	leftOffsetPercent (float64): The percentage distance from the left to start displaying the text.
-//	fontSize (float64): How large to make the text. Note: It scales with the baseWidthVoxelResolution.
+//	config (textRenderConfig): Font size, justification, and distance from the corresponding edge.
 //
 // Returns:
 //
 //	([]types.Triangle, error): A slice of triangles representing text.
-func renderText(text string, justification string, leftOffsetPercent float64, fontSize float64, baseWidth float64, baseHeight float64) ([]types.Triangle, error) {
+func renderText(text string, config textRenderConfig, baseWidth float64, baseHeight float64) ([]types.Triangle, error) {
 	// Create a rendering context for the face of the skyline
 	faceWidthRes := baseWidthVoxelResolution
 	faceHeightRes := int(float64(faceWidthRes) * baseHeight / baseWidth)
@@ -93,30 +104,21 @@ func renderText(text string, justification string, leftOffsetPercent float64, fo
 			return nil, errors.New(errors.IOError, "failed to load any fonts", err)
 		}
 	}
-	if err := dc.LoadFontFace(fontPath, fontSize); err != nil {
+	if err := dc.LoadFontFace(fontPath, config.fontSize); err != nil {
 		return nil, errors.New(errors.IOError, "failed to load font", err)
 	}
 
 	// Draw text on image at desired location
 	var triangles []types.Triangle
 
-	// Convert justification to a number
-	var justificationPercent float64
-	switch justification {
-	case "center":
-		justificationPercent = 0.5
-	case "right":
-		justificationPercent = 1.0
-	default:
-		justificationPercent = 0.0
-	}
+	horizontalPosition, justificationPercent := config.horizontalPlacement(faceWidthRes)
 
 	dc.DrawStringAnchored(
 		text,
-		float64(faceWidthRes)*leftOffsetPercent, // Offset from right
-		float64(faceHeightRes)*0.5,              // Offset from top
-		justificationPercent,                    // Justification (0.0=left, 0.5=center, 1.0=right)
-		0.5,                                     // Vertically aligned
+		horizontalPosition,         // Offset from the corresponding edge
+		float64(faceHeightRes)*0.5, // Offset from top
+		justificationPercent,       // Justification (0.0=left, 0.5=center, 1.0=right)
+		0.5,                        // Vertically aligned
 	)
 
 	// Convert context image pixels into voxels
@@ -142,6 +144,20 @@ func renderText(text string, justification string, leftOffsetPercent float64, fo
 	defer cleanup()
 
 	return triangles, nil
+}
+
+// horizontalPlacement returns the horizontal draw position and anchor used by
+// gg.DrawStringAnchored. Right-justified text measures edgeOffsetPercent from
+// the right edge so left- and right-aligned labels can share one edge distance.
+func (config textRenderConfig) horizontalPlacement(faceWidth int) (position float64, anchor float64) {
+	switch config.justification {
+	case "center":
+		return float64(faceWidth) * 0.5, 0.5
+	case "right":
+		return float64(faceWidth) * (1 - config.edgeOffsetPercent), 1.0
+	default:
+		return float64(faceWidth) * config.edgeOffsetPercent, 0.0
+	}
 }
 
 // createVoxelOnFace creates a voxel on the face of a skyline by generating a cube at the specified coordinates.

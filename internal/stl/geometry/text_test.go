@@ -62,11 +62,13 @@ func TestRenderText(t *testing.T) {
 	t.Run("verify text renders", func(t *testing.T) {
 		triangles, err := renderText(
 			"Mona", // text
-			"left", // justification
-			0.1,    // leftOffsetPercent
-			10.0,   // fontSize
-			200.0,  // baseWidth
-			10.0,   // baseHeight
+			textRenderConfig{
+				justification:     "left",
+				edgeOffsetPercent: 0.1,
+				fontSize:          10.0,
+			},
+			200.0, // baseWidth
+			10.0,  // baseHeight
 		)
 
 		if err != nil {
@@ -76,6 +78,65 @@ func TestRenderText(t *testing.T) {
 			t.Error("Expected non-zero triangles for rendered text")
 		}
 	})
+}
+
+func TestTextRenderConfigHorizontalPlacement(t *testing.T) {
+	tests := []struct {
+		name         string
+		config       textRenderConfig
+		wantPosition float64
+		wantAnchor   float64
+	}{
+		{
+			name: "username offset from left edge",
+			config: textRenderConfig{
+				justification:     "left",
+				edgeOffsetPercent: 0.1,
+			},
+			wantPosition: 200,
+			wantAnchor:   0,
+		},
+		{
+			name: "year offset from right edge",
+			config: textRenderConfig{
+				justification:     "right",
+				edgeOffsetPercent: 0.1,
+			},
+			wantPosition: 1800,
+			wantAnchor:   1,
+		},
+		{
+			name: "centered text ignores edge offset",
+			config: textRenderConfig{
+				justification:     "center",
+				edgeOffsetPercent: 0.1,
+			},
+			wantPosition: 1000,
+			wantAnchor:   0.5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			position, anchor := tt.config.horizontalPlacement(baseWidthVoxelResolution)
+			if position != tt.wantPosition {
+				t.Errorf("horizontalPlacement() position = %v, want %v", position, tt.wantPosition)
+			}
+			if anchor != tt.wantAnchor {
+				t.Errorf("horizontalPlacement() anchor = %v, want %v", anchor, tt.wantAnchor)
+			}
+		})
+	}
+}
+
+func TestDefaultTextConfigsUseSameEdgeDistance(t *testing.T) {
+	if usernameTextConfig.edgeOffsetPercent != yearTextConfig.edgeOffsetPercent {
+		t.Fatalf(
+			"default text edge offsets differ: username=%v year=%v",
+			usernameTextConfig.edgeOffsetPercent,
+			yearTextConfig.edgeOffsetPercent,
+		)
+	}
 }
 
 // TestRenderImage verifies internal image rendering functionality
