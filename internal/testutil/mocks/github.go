@@ -45,6 +45,9 @@ func (m *MockGitHubClient) FetchContributions(username string, year int) (*types
 	if m.Err != nil {
 		return nil, m.Err
 	}
+	if year < 2008 {
+		return nil, fmt.Errorf("year cannot be before GitHub's launch (2008)")
+	}
 	// Always return generated mock data with valid contributions
 	return fixtures.GenerateContributionsResponse(username, year), nil
 }
