@@ -48,6 +48,9 @@ func GenerateSkyline(startYear, endYear int, targetUser string, full bool, outpu
 			return errors.New(errors.NetworkError, "failed to get user join year", err)
 		}
 		startYear = joinYear
+		if startYear < utils.GitHubLaunchYear {
+			startYear = utils.GitHubLaunchYear
+		}
 		endYear = time.Now().Year()
 	}
 

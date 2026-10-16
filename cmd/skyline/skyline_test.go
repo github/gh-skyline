@@ -63,6 +63,17 @@ func TestGenerateSkyline(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:       "full range for account created before GitHub's launch",
+			targetUser: "testuser",
+			full:       true,
+			mockClient: &mocks.MockGitHubClient{
+				Username: "testuser",
+				JoinYear: 2006,
+				MockData: fixtures.GenerateContributionsResponse("testuser", 2024),
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

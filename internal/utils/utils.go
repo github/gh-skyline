@@ -10,7 +10,8 @@ import (
 
 // Constants for GitHub launch year and default output file format
 const (
-	githubLaunchYear = 2008
+	// GitHubLaunchYear is the earliest year GitHub has contribution data for.
+	GitHubLaunchYear = 2008
 	outputFileFormat = "%s-%s-github-skyline.stl"
 )
 
@@ -44,8 +45,8 @@ func ParseYearRange(yearRange string) (startYear, endYear int, err error) {
 // the start year is not greater than the end year.
 func validateYearRange(startYear, endYear int) error {
 	currentYear := time.Now().Year()
-	if startYear < githubLaunchYear || endYear > currentYear {
-		return fmt.Errorf("years must be between %d and %d", githubLaunchYear, currentYear)
+	if startYear < GitHubLaunchYear || endYear > currentYear {
+		return fmt.Errorf("years must be between %d and %d", GitHubLaunchYear, currentYear)
 	}
 	if startYear > endYear {
 		return fmt.Errorf("start year cannot be after end year")
