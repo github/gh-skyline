@@ -46,6 +46,8 @@ You can run the `gh skyline` command with the following flags:
 - `-w`, `--web`: Open the GitHub profile for the authenticated or specified user.
   - Example: `gh skyline --web`, `gh skyline --user mona --web`
 - `-a`, `--art-only`: Show the ASCII art preview without generating an STL file.
+- `--multi-part`: Write the base, the text (logo, username and year), and the skyline as three separate STL files for multi-color printing. The files share one coordinate system, so a slicer can load them as parts of one object and give each part its own filament.
+  - Example: `gh skyline --multi-part`
 
 ### Examples
 
@@ -77,6 +79,12 @@ Generate a skyline from the user's join year to the current year:
 
 ```bash
 gh skyline --full
+```
+
+Generate a multi-part skyline for multi-color printing. This writes `{username}-{year}-github-skyline-base.stl`, `{username}-{year}-github-skyline-text.stl`, and `{username}-{year}-github-skyline-skyline.stl`:
+
+```bash
+gh skyline --multi-part
 ```
 
 Generate only the ASCII preview for a skyline:

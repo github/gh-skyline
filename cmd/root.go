@@ -25,6 +25,7 @@ var (
 	debug     bool
 	web       bool
 	artOnly   bool
+	multiPart bool
 	output    string // new output path flag
 )
 
@@ -74,6 +75,7 @@ func initFlags() {
 	flags.BoolVarP(&web, "web", "w", false, "Open GitHub profile (authenticated or specified user).")
 	flags.BoolVarP(&artOnly, "art-only", "a", false, "Generate only ASCII preview")
 	flags.StringVarP(&output, "output", "o", "", "Output file path (optional)")
+	flags.BoolVar(&multiPart, "multi-part", false, "Write the base, text, and skyline as separate STL files for multi-color printing")
 }
 
 // executeRootCmd is the main execution function for the root command.
@@ -104,7 +106,7 @@ func handleSkylineCommand(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("invalid year range: %v", err)
 	}
 
-	return skyline.GenerateSkyline(startYear, endYear, user, full, output, artOnly)
+	return skyline.GenerateSkyline(startYear, endYear, user, full, output, artOnly, multiPart)
 }
 
 // Browser interface matches browser.Browser functionality.

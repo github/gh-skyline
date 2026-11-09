@@ -1,6 +1,7 @@
 package stl
 
 import (
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"strings"
@@ -199,6 +200,80 @@ func TestGenerateSTLRange(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGenerateMultiPartSTL(t *testing.T) {
+	contributions := [][][]types.ContributionDay{createTestContributions()}
+	tempDir := t.TempDir()
+	outputPath := filepath.Join(tempDir, "test.stl")
+
+	paths, err := GenerateMultiPartSTL(contributions, outputPath, "testuser", 2023, 2023)
+	if err != nil {
+		if strings.Contains(err.Error(), "failed to open image") ||
+			strings.Contains(err.Error(), "failed to load fonts") {
+			t.Skip("Skipping test due to missing required resources")
+		}
+		t.Fatalf("GenerateMultiPartSTL() error = %v", err)
+	}
+
+	want := []string{
+		filepath.Join(tempDir, "test-base.stl"),
+		filepath.Join(tempDir, "test-text.stl"),
+		filepath.Join(tempDir, "test-skyline.stl"),
+	}
+	if len(paths) != len(want) {
+		t.Fatalf("GenerateMultiPartSTL() wrote %d files, want %d", len(paths), len(want))
+	}
+
+	// The parts together must hold exactly the triangles of the single-file model.
+	combinedPath := filepath.Join(tempDir, "combined.stl")
+	if err := GenerateSTLRange(contributions, combinedPath, "testuser", 2023, 2023); err != nil {
+		t.Fatalf("GenerateSTLRange() error = %v", err)
+	}
+
+	total := 0
+	for i, path := range paths {
+		if path != want[i] {
+			t.Errorf("part %d path = %s, want %s", i, path, want[i])
+		}
+		count := readTriangleCount(t, path)
+		if count == 0 {
+			t.Errorf("part %s has no triangles", path)
+		}
+		total += count
+	}
+	if combined := readTriangleCount(t, combinedPath); total != combined {
+		t.Errorf("parts hold %d triangles, single-file model holds %d", total, combined)
+	}
+
+	if _, err := os.Stat(outputPath); !os.IsNotExist(err) {
+		t.Errorf("GenerateMultiPartSTL() should not write the single-file model %s", outputPath)
+	}
+}
+
+func TestGenerateMultiPartSTL_InvalidInput(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "test.stl")
+
+	if _, err := GenerateMultiPartSTL(nil, outputPath, "testuser", 2023, 2023); err == nil {
+		t.Error("GenerateMultiPartSTL() should return error for empty contributions")
+	}
+	contributions := [][][]types.ContributionDay{createTestContributions()}
+	if _, err := GenerateMultiPartSTL(contributions, outputPath, "", 2023, 2023); err == nil {
+		t.Error("GenerateMultiPartSTL() should return error for empty username")
+	}
+}
+
+// readTriangleCount returns the triangle count stored in a binary STL file's header.
+func readTriangleCount(t *testing.T, path string) int {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", path, err)
+	}
+	if len(data) < 84 {
+		t.Fatalf("%s is too short to be a binary STL file", path)
+	}
+	return int(binary.LittleEndian.Uint32(data[80:84]))
 }
 
 func TestValidateInput(t *testing.T) {
