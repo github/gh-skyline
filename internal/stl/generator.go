@@ -2,6 +2,8 @@ package stl
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/github/gh-skyline/internal/errors"
 	"github.com/github/gh-skyline/internal/logger"
@@ -31,32 +33,10 @@ func GenerateSTLRange(contributions [][][]types.ContributionDay, outputPath, use
 		return errors.Wrap(err, "failed to log debug message")
 	}
 
-	if len(contributions) == 0 {
-		return errors.New(errors.ValidationError, "contributions data cannot be empty", nil)
-	}
-
-	if err := validateInput(contributions[0], outputPath, username); err != nil {
-		return errors.Wrap(err, "input validation failed")
-	}
-
-	// Apply the same size bounds to every remaining year.
-	// outputPath and username are shared across all years and have already been validated above.
-	for i := 1; i < len(contributions); i++ {
-		if len(contributions[i]) == 0 {
-			return errors.New(errors.ValidationError, fmt.Sprintf("contributions data for year index %d cannot be empty", i), nil)
-		}
-		if len(contributions[i]) > geometry.GridSize {
-			return errors.New(errors.ValidationError, fmt.Sprintf("contributions data for year index %d exceeds maximum grid size", i), nil)
-		}
-	}
-
-	dimensions, err := calculateDimensions(len(contributions))
+	dimensions, maxContribution, err := prepareModel(contributions, outputPath, username)
 	if err != nil {
-		return errors.Wrap(err, "failed to calculate dimensions")
+		return err
 	}
-
-	// Find global max contribution across all years
-	maxContribution := findMaxContributionsAcrossYears(contributions)
 
 	modelTriangles, err := generateModelGeometry(contributions, dimensions, maxContribution, username, startYear, endYear)
 	if err != nil {
@@ -78,6 +58,78 @@ func GenerateSTLRange(contributions [][][]types.ContributionDay, outputPath, use
 		return errors.Wrap(err, "failed to log info message")
 	}
 	return nil
+}
+
+// GenerateMultiPartSTL writes the model as three STL files that share one coordinate system,
+// so a slicer can load them as parts of one object and give each part its own filament:
+//   - {name}-base.stl: the base
+//   - {name}-text.stl: the logo, username and year(s) on the front of the base
+//   - {name}-skyline.stl: the contribution columns
+//
+// {name} is outputPath without its extension. It returns the paths it wrote, in that order.
+func GenerateMultiPartSTL(contributions [][][]types.ContributionDay, outputPath, username string, startYear, endYear int) ([]string, error) {
+	dimensions, maxContribution, err := prepareModel(contributions, outputPath, username)
+	if err != nil {
+		return nil, err
+	}
+
+	parts, err := generateModelParts(contributions, dimensions, maxContribution, username, startYear, endYear)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate geometry")
+	}
+
+	stem := strings.TrimSuffix(outputPath, filepath.Ext(outputPath))
+	files := []struct {
+		path      string
+		triangles []types.Triangle
+	}{
+		{stem + "-base.stl", parts.base},
+		{stem + "-text.stl", append(append([]types.Triangle{}, parts.text...), parts.logo...)},
+		{stem + "-skyline.stl", parts.columns},
+	}
+
+	paths := make([]string, 0, len(files))
+	for _, f := range files {
+		if err := WriteSTLBinary(f.path, f.triangles); err != nil {
+			return nil, errors.Wrap(err, "failed to write STL file")
+		}
+		if err := logger.GetLogger().Info("STL part written successfully to: %s", f.path); err != nil {
+			return nil, errors.Wrap(err, "failed to log info message")
+		}
+		paths = append(paths, f.path)
+	}
+
+	return paths, nil
+}
+
+// prepareModel validates the input and returns the model dimensions and the highest
+// daily contribution count, which every column height is scaled against.
+func prepareModel(contributions [][][]types.ContributionDay, outputPath, username string) (modelDimensions, int, error) {
+	if len(contributions) == 0 {
+		return modelDimensions{}, 0, errors.New(errors.ValidationError, "contributions data cannot be empty", nil)
+	}
+
+	if err := validateInput(contributions[0], outputPath, username); err != nil {
+		return modelDimensions{}, 0, errors.Wrap(err, "input validation failed")
+	}
+
+	// Apply the same size bounds to every remaining year.
+	// outputPath and username are shared across all years and have already been validated above.
+	for i := 1; i < len(contributions); i++ {
+		if len(contributions[i]) == 0 {
+			return modelDimensions{}, 0, errors.New(errors.ValidationError, fmt.Sprintf("contributions data for year index %d cannot be empty", i), nil)
+		}
+		if len(contributions[i]) > geometry.GridSize {
+			return modelDimensions{}, 0, errors.New(errors.ValidationError, fmt.Sprintf("contributions data for year index %d exceeds maximum grid size", i), nil)
+		}
+	}
+
+	dimensions, err := calculateDimensions(len(contributions))
+	if err != nil {
+		return modelDimensions{}, 0, errors.Wrap(err, "failed to calculate dimensions")
+	}
+
+	return dimensions, findMaxContributionsAcrossYears(contributions), nil
 }
 
 // modelDimensions represents the core measurements of the 3D model.
@@ -156,50 +208,72 @@ type geometryResult struct {
 	err       error
 }
 
-// generateModelGeometry orchestrates the concurrent generation of all model components.
+// modelParts holds the triangles of each model component.
+type modelParts struct {
+	base    []types.Triangle
+	columns []types.Triangle
+	text    []types.Triangle
+	logo    []types.Triangle
+}
+
+// generateModelGeometry returns the triangles of all model components in one slice,
+// appended base → columns → text → image for a reproducible STL output across runs.
+func generateModelGeometry(contributionsPerYear [][][]types.ContributionDay, dims modelDimensions, maxContrib int, username string, startYear, endYear int) ([]types.Triangle, error) {
+	parts, err := generateModelParts(contributionsPerYear, dims, maxContrib, username, startYear, endYear)
+	if err != nil {
+		return nil, err
+	}
+
+	modelTriangles := make([]types.Triangle, 0, len(parts.base)+len(parts.columns)+len(parts.text)+len(parts.logo))
+	modelTriangles = append(modelTriangles, parts.base...)
+	modelTriangles = append(modelTriangles, parts.columns...)
+	modelTriangles = append(modelTriangles, parts.text...)
+	modelTriangles = append(modelTriangles, parts.logo...)
+
+	return modelTriangles, nil
+}
+
+// generateModelParts orchestrates the concurrent generation of all model components.
 // It manages four parallel processes for generating the base, columns, text, and logo.
 // Channels are buffered so every goroutine can send and exit even if an error causes
 // an early return, preventing goroutine leaks.
-func generateModelGeometry(contributionsPerYear [][][]types.ContributionDay, dims modelDimensions, maxContrib int, username string, startYear, endYear int) ([]types.Triangle, error) {
+func generateModelParts(contributionsPerYear [][][]types.ContributionDay, dims modelDimensions, maxContrib int, username string, startYear, endYear int) (modelParts, error) {
 	if len(contributionsPerYear) == 0 {
-		return nil, errors.New(errors.ValidationError, "contributions data cannot be empty", nil)
+		return modelParts{}, errors.New(errors.ValidationError, "contributions data cannot be empty", nil)
 	}
 
-	// componentChannel pairs a name with its buffered result channel.
-	// Using a slice (not a map) preserves a stable iteration order so that
-	// triangles are always appended base → columns → text → image, giving
-	// reproducible STL output across runs.
-	type componentChannel struct {
-		name string
-		ch   chan geometryResult
-	}
-
-	// Buffered channels (size 1) allow each goroutine to send its result and exit
-	// regardless of whether the main goroutine reads or returns early on error.
-	components := []componentChannel{
-		{"base", make(chan geometryResult, 1)},
-		{"columns", make(chan geometryResult, 1)},
-		{"text", make(chan geometryResult, 1)},
-		{"image", make(chan geometryResult, 1)},
-	}
+	baseCh := make(chan geometryResult, 1)
+	columnsCh := make(chan geometryResult, 1)
+	textCh := make(chan geometryResult, 1)
+	logoCh := make(chan geometryResult, 1)
 
 	// Launch goroutines for each component
-	go generateBase(dims, components[0].ch)
-	go generateColumnsForYearRange(contributionsPerYear, maxContrib, components[1].ch)
-	go generateText(username, startYear, endYear, dims, components[2].ch)
-	go generateLogo(dims, components[3].ch)
+	go generateBase(dims, baseCh)
+	go generateColumnsForYearRange(contributionsPerYear, maxContrib, columnsCh)
+	go generateText(username, startYear, endYear, dims, textCh)
+	go generateLogo(dims, logoCh)
 
-	// Collect results in declaration order for a reproducible triangle sequence.
-	modelTriangles := make([]types.Triangle, 0, estimateTriangleCount(contributionsPerYear[0])*len(contributionsPerYear))
+	// Collect results in a fixed order so errors are reported consistently.
+	var parts modelParts
+	components := []struct {
+		name string
+		ch   chan geometryResult
+		dst  *[]types.Triangle
+	}{
+		{"base", baseCh, &parts.base},
+		{"columns", columnsCh, &parts.columns},
+		{"text", textCh, &parts.text},
+		{"image", logoCh, &parts.logo},
+	}
 	for _, component := range components {
 		result := <-component.ch
 		if result.err != nil {
-			return nil, errors.Wrap(result.err, fmt.Sprintf("failed to generate %s geometry", component.name))
+			return modelParts{}, errors.Wrap(result.err, fmt.Sprintf("failed to generate %s geometry", component.name))
 		}
-		modelTriangles = append(modelTriangles, result.triangles...)
+		*component.dst = result.triangles
 	}
 
-	return modelTriangles, nil
+	return parts, nil
 }
 
 func generateBase(dims modelDimensions, ch chan<- geometryResult) {

@@ -34,7 +34,7 @@ func TestRootCmd(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	flags := rootCmd.Flags()
-	expectedFlags := []string{"year", "user", "full", "debug", "web", "art-only", "output"}
+	expectedFlags := []string{"year", "user", "full", "debug", "web", "art-only", "output", "multi-part"}
 	for _, flag := range expectedFlags {
 		if flags.Lookup(flag) == nil {
 			t.Errorf("expected flag %s to be initialized", flag)

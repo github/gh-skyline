@@ -22,8 +22,9 @@ type GitHubClientInterface interface {
 	FetchContributions(username string, year int) (*types.ContributionsResponse, error)
 }
 
-// GenerateSkyline creates a 3D model with ASCII art preview of GitHub contributions for the specified year range, or "full lifetime" of the user
-func GenerateSkyline(startYear, endYear int, targetUser string, full bool, output string, artOnly bool) error {
+// GenerateSkyline creates a 3D model with ASCII art preview of GitHub contributions for the specified year range, or "full lifetime" of the user.
+// With multiPart, the model is written as separate base, text, and skyline STL files for multi-color printing.
+func GenerateSkyline(startYear, endYear int, targetUser string, full bool, output string, artOnly bool, multiPart bool) error {
 	log := logger.GetLogger()
 
 	client, err := github.InitializeGitHubClient()
@@ -73,6 +74,11 @@ func GenerateSkyline(startYear, endYear int, targetUser string, full bool, outpu
 	if !artOnly {
 		// Generate filename
 		outputPath := utils.GenerateOutputFilename(targetUser, startYear, endYear, output)
+
+		if multiPart {
+			_, err := stl.GenerateMultiPartSTL(allContributions, outputPath, targetUser, startYear, endYear)
+			return err
+		}
 
 		// Generate the STL file
 		if len(allContributions) == 1 {
